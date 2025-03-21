@@ -53,3 +53,31 @@ export const JiraCheckUserIssuesRequestSchema = JiraApiRequestSchema.shape({
     projectKey: yup.string().required("Project key is required"),
     userName: yup.string().required("User name is required"),
 });
+
+/**
+ * Schema for validating Jira create issue requests
+ * Extends the base API schema with fields needed for issue creation
+ * 
+ * @type {yup.ObjectSchema}
+ */
+export const JiraCreateIssueRequestSchema = JiraApiRequestSchema.shape({
+    projectKey: yup.string().required("Project key is required"),
+    summary: yup.string().required("Issue summary/title is required"),
+    description: yup.string().required("Issue description is required"),
+    issueType: yup.string().default("Task"),
+    assigneeName: yup.string(),
+    reporterName: yup.string(),
+    sprintId: yup.string(),
+});
+
+/**
+ * Schema for validating Jira sprint query requests
+ * Extends the base API schema with optional fields for filtering sprints
+ * 
+ * @type {yup.ObjectSchema}
+ */
+export const JiraSprintRequestSchema = JiraApiRequestSchema.shape({
+    boardId: yup.string(),
+    projectKey: yup.string(),
+    state: yup.string().oneOf(['active', 'future', 'closed', 'all']).default('active'),
+});
