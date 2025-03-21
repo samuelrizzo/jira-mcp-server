@@ -33,6 +33,8 @@ A Model Context Protocol (MCP) server for Jira integration. This server allows A
 - Search issues by project and assignee
 - List project members
 - Check user's project membership and assigned issues
+- Create new issues with custom fields
+- List and query sprints with filtering options
 
 ## Installation
 
@@ -140,6 +142,36 @@ Checks if a user is a member of a project and lists their assigned issues.
 - `email`: Your Jira email
 - `apiToken`: Your Jira API token
 
+### 6. Create Issue (`mcp_jira_create_issue`)
+
+Creates a new issue in a Jira project with specified details.
+
+**Parameters:**
+
+- `projectKey`: The Jira project key
+- `summary`: The title/summary of the issue
+- `description`: Detailed description of the issue
+- `issueType`: (Optional) Type of issue (e.g., 'Task', 'Bug', 'Story'), defaults to 'Task'
+- `assigneeName`: (Optional) The display name of the person to assign the issue to
+- `reporterName`: (Optional) The display name of the person reporting the issue
+- `sprintId`: (Optional) ID of the sprint to add the issue to
+- `jiraHost`: Your Jira domain
+- `email`: Your Jira email
+- `apiToken`: Your Jira API token
+
+### 7. List Sprints (`mcp_jira_list_sprints`)
+
+Lists current sprints in Jira with filtering options.
+
+**Parameters:**
+
+- `boardId`: (Optional) Jira board ID to filter sprints by a specific board
+- `projectKey`: (Optional) Project key to find sprints associated with the project
+- `state`: (Optional) Sprint state to filter by (active, future, closed, or all), defaults to 'active'
+- `jiraHost`: Your Jira domain
+- `email`: Your Jira email
+- `apiToken`: Your Jira API token
+
 ## Usage Examples
 
 Here are some example queries you can use with Claude:
@@ -150,6 +182,8 @@ Here are some example queries you can use with Claude:
 "Search for issues assigned to John in PROJECT"
 "List all members of PROJECT"
 "Check what issues are assigned to Jane in PROJECT"
+"Create a new bug issue titled 'Login page error' in PROJECT"
+"List active sprints for PROJECT"
 ```
 
 ## Continuous Development
