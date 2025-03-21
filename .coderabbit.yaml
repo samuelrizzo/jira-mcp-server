@@ -1,0 +1,224 @@
+language: pt-BR
+tone_instructions: 'Seja direto, detalhado e EXTREMAMENTE exigente. Rejeite qualquer código que não atenda aos mais altos padrões de qualidade, performance e legibilidade. Insista em soluções SIMPLES e CLARAS.'
+early_access: false
+enable_free_tier: true
+
+reviews:
+  profile: chill
+  request_changes_workflow: true
+  high_level_summary: true
+  high_level_summary_placeholder: '@coderabbitai summary'
+  auto_title_placeholder: '@coderabbitai'
+  review_status: true
+  poem: true
+  collapse_walkthrough: true
+  sequence_diagrams: true
+  changed_files_summary: true
+  auto_apply_labels: true
+  labeling_instructions:
+    - label: "api"
+      instructions: "Aplicar quando o PR contém alterações em endpoints da API ou implementa novos endpoints"
+    - label: "backend"
+      instructions: "Aplicar quando o PR modifica a lógica do lado do servidor ou implementa novas funcionalidades backend"
+    - label: "bug"
+      instructions: "Aplicar quando o PR corrige um problema ou comportamento incorreto no sistema"
+    - label: "database"
+      instructions: "Aplicar quando o PR envolve alterações no banco de dados, queries ou estrutura de dados"
+    - label: "devops"
+      instructions: "Aplicar quando o PR inclui mudanças em infraestrutura, pipelines de CI/CD ou configurações de deploy"
+    - label: "documentation"
+      instructions: "Aplicar quando o PR adiciona ou melhora a documentação do projeto"
+    - label: "duplicate"
+      instructions: "Aplicar quando o PR implementa algo que já existe ou já foi proposto em outro PR"
+    - label: "enhancement"
+      instructions: "Aplicar quando o PR implementa uma nova feature ou melhoria no sistema"
+    - label: "frontend"
+      instructions: "Aplicar quando o PR contém alterações na UI/UX ou trabalho relacionado ao frontend"
+    - label: "performance"
+      instructions: "Aplicar quando o PR implementa melhorias de performance ou otimizações"
+    - label: "security"
+      instructions: "Aplicar quando o PR contém alterações relacionadas à segurança do sistema"
+    - label: "tests"
+      instructions: "Aplicar quando o PR adiciona ou corrige testes automatizados"
+    - label: "breaking-change"
+      instructions: "Aplicar quando o PR introduz mudanças incompatíveis com versões anteriores"
+    - label: "dependencies"
+      instructions: "Aplicar quando o PR atualiza dependências ou adiciona novas"
+    - label: "debt"
+      instructions: "Aplicar quando o PR resolve dívida técnica"
+  path_filters: []
+  path_instructions:
+    - path: '**/*.ts'
+      instructions: |
+        # PRINCÍPIOS FUNDAMENTAIS
+        A SIMPLICIDADE é o princípio mais importante deste projeto. Código simples é código que:
+        - É fácil de entender à primeira leitura
+        - Tem uma única responsabilidade clara
+        - Usa abstrações apropriadas (nem mais, nem menos)
+        - Tem nomes descritivos que refletem exatamente o que faz
+        
+        # REGRAS GERAIS
+        1. Apenas pull requests da branch release podem ser mergeados para a main.
+        2. É ESTRITAMENTE PROIBIDO utilizar qualquer tipo de comentário para desativar o eslint.
+        3. Todo código deve seguir os princípios SOLID, DRY e KISS.
+        4. Funções não devem ter mais de 15 linhas de código.
+        5. Arquivos não devem exceder 150 linhas de código.
+        6. Não use variáveis globais.
+        7. Limite o uso de comentários - o código deve ser autoexplicativo.
+        8. Complexidade ciclomática máxima por função: 8.
+        9. Profundidade máxima de aninhamento: 2.
+        10. Todo código deve ser testado adequadamente.
+        
+        # PERFORMANCE
+        1. Evite loops aninhados (complexidade O(n²) ou pior).
+        2. Prefira métodos de array funcionais (map, filter, reduce) sobre loops tradicionais.
+        3. Minimize operações síncronas bloqueantes.
+        4. Cache resultados de operações caras quando apropriado.
+        5. Evite criar muitos objetos temporários.
+        6. Utilize lazy loading quando apropriado.
+        
+        # TIPAGEM
+        1. Tipagem explícita é obrigatória em todos os lugares.
+        2. Proibido o uso de 'any', 'unknown' ou 'object'.
+        3. Interfaces devem ser usadas para definir contratos, types para aliases.
+        4. Utilize union types ao invés de herança quando apropriado.
+        5. Use literais de tipo quando possível para aumentar a type safety.
+        6. Evite type assertions (as) - prefira type guards.
+        7. Todos os parâmetros de função devem ser tipados explicitamente.
+        8. Todas as funções devem ter tipo de retorno explícito.
+        
+        # NOMENCLATURA
+        1. Use nomes descritivos que reflitam exatamente o propósito.
+        2. Variáveis/propriedades: camelCase (e.g., dadosUsuario).
+        3. Classes/Interfaces/Types: PascalCase (e.g., UsuarioService).
+        4. Constantes: SNAKE_CASE_MAIÚSCULO (e.g., API_BASE_URL).
+        5. Proibido o uso de nomes genéricos: temp, data, item, test, teste, etc.
+        6. Funções devem começar com verbos que descrevem ações (e.g., buscarUsuario).
+        7. Nomes de booleanos devem começar com is, has, should, etc.
+        8. Evite abreviações, exceto quando extremamente comuns (ID, URL).
+        
+        # ESTRUTURA
+        1. Funções não devem ter mais de 3 parâmetros.
+        2. Sem funções aninhadas.
+        3. Um arquivo deve conter uma única classe/componente/entidade.
+        4. Use early returns para reduzir aninhamento de condicionais.
+        5. Prefira composição sobre herança.
+        6. Mantenha a consistência na ordenação de imports e membros de classe.
+        7. Prefira funções puras quando possível.
+        
+        # LOGGING & ERROS
+        1. Proibido o uso de console.log - use o sistema de log do projeto.
+        2. Todos os erros devem ser tratados apropriadamente.
+        3. Use mensagens de erro descritivas e acionáveis.
+        4. Crie classes de erro personalizadas quando apropriado.
+        5. Registre informações de diagnóstico suficientes, mas não sensíveis.
+        
+        # SEGURANÇA
+        1. Nunca confie em dados vindos do cliente sem validação.
+        2. Todos os inputs externos devem ser validados e sanitizados.
+        3. Evite SQL/NoSQL injection usando parâmetros preparados ou ORMs.
+        4. Não exponha informações sensíveis em logs ou mensagens de erro.
+        5. Implemente limitação de taxa (rate limiting) para operações pesadas.
+        6. Use HTTPS para todas as comunicações externas.
+        7. Nunca armazene credenciais em código ou em texto simples.
+    
+    - path: 'src/types/**/*.ts'
+      instructions: |
+        # REGRAS ESPECÍFICAS PARA TYPES
+        1. Arquivos de tipos devem conter apenas definições de tipos, não lógica.
+        2. Cada tipo deve ter um comentário explicando seu propósito.
+        3. Use types compostos para evitar duplicação.
+        4. Prefira types readonly quando apropriado.
+        5. Evite tipos muito genéricos ou muito específicos.
+        6. Use enums para valores finitos e conhecidos.
+        7. Mantenha a mesma estrutura de nomes dos objetos que representam.
+        8. Utilize branded/tagged types para evitar confusão entre tipos semanticamente diferentes.
+        9. Documente cada propriedade com comentários.
+        10. Agrupe propriedades relacionadas em tipos aninhados.
+    
+    - path: 'src/handlers/**/*.ts'
+      instructions: |
+        # REGRAS ESPECÍFICAS PARA HANDLERS
+        1. Os handlers devem ser puros: recebem requisição, retornam resposta.
+        2. Lógica de negócio complexa deve estar em serviços, não nos handlers.
+        3. Handlers são responsáveis apenas pela validação de entrada e formatação de saída.
+        4. Implemente tratamento de erros de forma consistente.
+        5. Use injeção de dependência para serviços externos.
+        6. Documente todos os handlers com comentários JSDoc.
+        7. Todos os handlers devem ser testados individualmente.
+        8. Valide todas as entradas usando esquemas de validação (yup).
+    
+    - path: 'src/tools/**/*.ts'
+      instructions: |
+        # REGRAS ESPECÍFICAS PARA TOOLS
+        1. Cada ferramenta deve ter uma única responsabilidade.
+        2. Documente cada ferramenta com JSDoc incluindo exemplos de uso.
+        3. Ferramentas devem ter testes unitários abrangentes.
+        4. Implemente validação de parâmetros no início de cada função.
+        5. Adicione logging para operações importantes ou de longa duração.
+        6. Use tratamento de erro específico para cada tipo de falha.
+        7. Seja consistente na interface de todas as ferramentas.
+        8. Ferramentas não devem manter estado, a menos que absolutamente necessário.
+    
+    - path: 'src/utils/**/*.ts'
+      instructions: |
+        # REGRAS ESPECÍFICAS PARA UTILS
+        1. Funções utilitárias devem ser puras sempre que possível.
+        2. Documente cada função com JSDoc completo.
+        3. Todas as funções utilitárias devem ter testes unitários completos.
+        4. Agrupe funções relacionadas em arquivos por domínio.
+        5. Utilitários devem ser genéricos o suficiente para reuso.
+        6. Não dependa de estado global ou específico de contexto.
+        7. Implemente validação de argumentos robusta.
+        8. Exponha interfaces claras e bem tipadas.
+    
+    - path: 'src/validators/**/*.ts'
+      instructions: |
+        # REGRAS ESPECÍFICAS PARA VALIDATORS
+        1. Use schemas de validação (yup) de forma consistente.
+        2. Mensagens de erro devem ser claras e úteis para o desenvolvedor.
+        3. Validadores devem ser reutilizáveis quando possível.
+        4. Implemente validação em camadas (sintática, semântica, de negócio).
+        5. Documente cada validador com JSDoc.
+        6. Teste casos válidos e inválidos para cada validador.
+        7. Mantenha esquemas de validação sincronizados com tipos TypeScript.
+        8. Use constantes para valores mágicos em esquemas de validação.
+  
+  abort_on_close: true
+  auto_review:
+    enabled: true
+    auto_incremental_review: false
+    ignore_title_keywords: []
+    labels: []
+    drafts: false
+    base_branches:
+      - develop
+      - release
+      - staging
+      - main
+      - ^(feature|fix|bugfix|hotfix)\/([\w-]+)\/[\w.-]{3,50}$
+  tools:
+    ast-grep:
+      packages: []
+      rule_dirs:
+        - './ast-grep-rules'
+      util_dirs: []
+      essential_rules: true
+    eslint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    shellcheck:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  pull_requests:
+    scope: auto

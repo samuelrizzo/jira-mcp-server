@@ -1,0 +1,3 @@
+rule:
+  message: "Evite o uso do tipo any. Prefira usar tipos explícitos e definidos."
+  pattern: ": any"

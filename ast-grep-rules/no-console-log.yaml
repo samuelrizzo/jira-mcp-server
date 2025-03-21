@@ -1,0 +1,3 @@
+rule:
+  message: "O uso de console.log é proibido. Utilize um sistema de log adequado para o projeto."
+  pattern: "console.log($EXPRESSION)"

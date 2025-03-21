@@ -1,0 +1,5 @@
+rule:
+  message: "Funções com muitos parâmetros devem ser refatoradas para diminuir a complexidade."
+  pattern: "function $NAME($PARAMS) { }"
+  condition:
+    - "$PARAMS.length > 3"

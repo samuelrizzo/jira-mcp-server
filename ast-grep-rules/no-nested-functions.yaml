@@ -1,0 +1,3 @@
+rule:
+  message: "Funções não devem ser aninhadas desnecessariamente. Mantenha a clareza e a simplicidade no código."
+  pattern: "function $NAME($PARAMS) { function $INNERNAME($INNERPARAMS) {} }"

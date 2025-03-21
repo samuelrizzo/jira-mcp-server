@@ -1,0 +1,5 @@
+rule:
+  message: "O TypeScript deve ser utilizado com tipagem explícita. Variáveis e funções devem ter tipos definidos."
+  pattern: "$DECLARATION = $VALUE"
+  condition:
+    - "$DECLARATION !~ /: [a-zA-Z]+/"

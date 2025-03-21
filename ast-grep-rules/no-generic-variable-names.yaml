@@ -1,0 +1,3 @@
+rule:
+  message: "Evite nomes genéricos como temp, data, item, test, teste; prefira nomes que descrevam claramente o propósito da variável."
+  pattern: '$IDENTIFIER =~ /^(temp|data|item|test|teste)$/'
