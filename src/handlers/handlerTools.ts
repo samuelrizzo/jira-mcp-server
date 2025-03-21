@@ -4,7 +4,9 @@ import {
     getIssue,
     searchIssues,
     listProjectMembers,
-    checkUserIssues
+    checkUserIssues,
+    createIssue,
+    listSprints
 } from "../tools/index.js";
 import {
     JiraApiRequestSchema,
@@ -12,6 +14,8 @@ import {
     JiraSearchIssuesRequestSchema,
     JiraProjectMembersRequestSchema,
     JiraCheckUserIssuesRequestSchema,
+    JiraCreateIssueRequestSchema,
+    JiraSprintRequestSchema
 } from "../validators/index.js";
 import { validateCredentials } from "../utils/auth.js";
 
@@ -40,6 +44,14 @@ const toolConfigs: Record<string, ToolConfig> = {
     jira_check_user_issues: {
         schema: JiraCheckUserIssuesRequestSchema,
         handler: checkUserIssues
+    },
+    jira_create_issue: {
+        schema: JiraCreateIssueRequestSchema,
+        handler: createIssue
+    },
+    jira_list_sprints: {
+        schema: JiraSprintRequestSchema,
+        handler: listSprints
     }
 };
 
