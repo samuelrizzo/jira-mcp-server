@@ -112,6 +112,71 @@ export async function handleListTools(request: any) {
                     required: ["projectKey", "userName"],
                 },
             },
+            {
+                name: "jira_create_issue",
+                description: "Creates a new issue in a Jira project with specified details",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        ...getCommonJiraProperties(),
+                        projectKey: {
+                            type: "string",
+                            description: "The Jira project key (e.g., 'PROJECT')",
+                        },
+                        summary: {
+                            type: "string",
+                            description: "The title/summary of the issue",
+                        },
+                        description: {
+                            type: "string",
+                            description: "Detailed description of the issue",
+                        },
+                        issueType: {
+                            type: "string",
+                            description: "Type of issue (e.g., 'Task', 'Bug', 'Story')",
+                            default: "Task",
+                        },
+                        assigneeName: {
+                            type: "string",
+                            description: "The display name of the person to assign the issue to",
+                        },
+                        reporterName: {
+                            type: "string",
+                            description: "The display name of the person reporting the issue",
+                        },
+                        sprintId: {
+                            type: "string",
+                            description: "ID of the sprint to add the issue to",
+                        },
+                    },
+                    required: ["projectKey", "summary", "description"],
+                },
+            },
+            {
+                name: "jira_list_sprints",
+                description: "Lists current sprints in Jira with filtering options",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        ...getCommonJiraProperties(),
+                        boardId: {
+                            type: "string",
+                            description: "Optional Jira board ID to filter sprints by a specific board",
+                        },
+                        projectKey: {
+                            type: "string",
+                            description: "Optional project key to find sprints associated with the project",
+                        },
+                        state: {
+                            type: "string",
+                            description: "Sprint state to filter by (active, future, closed, or all)",
+                            default: "active",
+                            enum: ["active", "future", "closed", "all"]
+                        },
+                    },
+                    required: [],
+                },
+            },
         ],
     };
 }

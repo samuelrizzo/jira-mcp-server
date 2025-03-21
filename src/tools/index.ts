@@ -27,3 +27,13 @@ export {
     checkUserIssues,
     checkUserIssuesToolDescription
 } from './checkUserIssues.js';
+
+export {
+    createIssue,
+    createIssueToolDescription
+} from './createIssue.js';
+
+export {
+    listSprints,
+    listSprintsToolDescription
+} from './listSprints.js';
