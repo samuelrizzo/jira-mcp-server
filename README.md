@@ -22,7 +22,7 @@ A Model Context Protocol (MCP) server for Jira integration. This server allows A
 <div align="center">
 
 [![GitHub followers](https://img.shields.io/github/followers/samuelrizzo?style=social)](https://github.com/samuelrizzo)
-[![Twitter Follow](https://img.shields.io/twitter/follow/samuelrizzo?style=social)](https://twitter.com/samuelrizzo)
+[![Twitter Follow](https://img.shields.io/twitter/follow/rizzo_exe?style=social)](https://twitter.com/rizzo_exe)
 
 </div>
 
