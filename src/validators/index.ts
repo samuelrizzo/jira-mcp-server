@@ -64,7 +64,7 @@ export const JiraCreateIssueRequestSchema = JiraApiRequestSchema.shape({
     projectKey: yup.string().required("Project key is required"),
     summary: yup.string().required("Issue summary/title is required"),
     description: yup.string().required("Issue description is required"),
-    issueType: yup.string().default("Task"),
+    issueType: yup.string().oneOf(['Task', 'Bug', 'Story', 'Epic'], "Issue type must be one of: Task, Bug, Story, Epic").default("Task"),
     assigneeName: yup.string(),
     reporterName: yup.string(),
     sprintId: yup.string(),
