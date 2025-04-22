@@ -1,6 +1,7 @@
 import axios from "axios";
 import { JiraCreateIssueRequestSchema } from "../validators/index.js";
 import { createAuthHeader, validateCredentials } from "../utils/auth.js";
+import { toADF } from "../utils/adfUtils.js";
 
 /**
  * Description object for the Jira create issue tool
@@ -39,8 +40,11 @@ export const createIssueToolDescription = {
                 description: "The title/summary of the issue",
             },
             description: {
-                type: "string",
-                description: "Detailed description of the issue",
+                oneOf: [
+                    { type: "string", description: "Detailed description of the issue (plain text or markdown, will be converted to ADF)" },
+                    { type: "object", description: "ADF (Atlassian Document Format) object, see https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/" }
+                ],
+                description: "Detailed description of the issue. Accepts plain text, markdown, or Atlassian Document Format (ADF) object.",
             },
             issueType: {
                 type: "string",
@@ -74,7 +78,7 @@ export const createIssueToolDescription = {
  * @param {string} args.apiToken - API token for authentication
  * @param {string} args.projectKey - The project key
  * @param {string} args.summary - Issue title/summary
- * @param {string} args.description - Issue description
+ * @param {string|object} args.description - Issue description (plain text, markdown, or Atlassian Document Format object)
  * @param {string} [args.issueType] - Type of issue
  * @param {string} [args.assigneeName] - Name of the assignee
  * @param {string} [args.reporterName] - Name of the reporter
@@ -91,6 +95,7 @@ export async function createIssue(args: any) {
     const projectKey = validatedArgs.projectKey;
     const summary = validatedArgs.summary;
     const description = validatedArgs.description;
+    const adfDescription = toADF(description);
     const issueType = validatedArgs.issueType || "Task";
     const assigneeName = validatedArgs.assigneeName;
     const reporterName = validatedArgs.reporterName;
@@ -112,21 +117,7 @@ export async function createIssue(args: any) {
                     key: projectKey
                 },
                 summary: summary,
-                description: {
-                    type: "doc",
-                    version: 1,
-                    content: [
-                        {
-                            type: "paragraph",
-                            content: [
-                                {
-                                    type: "text",
-                                    text: description
-                                }
-                            ]
-                        }
-                    ]
-                },
+                description: adfDescription,
                 issuetype: {
                     name: issueType
                 }
@@ -252,7 +243,7 @@ export async function createIssue(args: any) {
             formattedResponse += `| Sprint | ${sprintId} |\n`;
         }
 
-        formattedResponse += `\n## Description\n\n${description}\n\n`;
+        formattedResponse += `\n## Description\n\n${typeof description === 'string' ? description : '[ADF description provided]'}\n\n`;
         formattedResponse += `\n**Issue link:** [${issue.key}](https://${jiraHost}/browse/${issue.key})\n`;
 
         return {
