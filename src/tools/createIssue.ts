@@ -243,7 +243,20 @@ export async function createIssue(args: any) {
             formattedResponse += `| Sprint | ${sprintId} |\n`;
         }
 
-        formattedResponse += `\n## Description\n\n${typeof description === 'string' ? description : '[ADF description provided]'}\n\n`;
+        let descriptionPreview = '';
+        if (adfDescription && typeof adfDescription === 'object' && adfDescription.type === 'doc' && Array.isArray(adfDescription.content)) {
+            descriptionPreview = adfDescription.content.map((block: any) => {
+                if (block.type === 'paragraph' && Array.isArray(block.content)) {
+                    return block.content.map((c: any) => c.text).join('');
+                }
+                return '';
+            }).join('\n');
+        } else if (typeof description === 'string') {
+            descriptionPreview = description;
+        } else {
+            descriptionPreview = '[ADF description provided]';
+        }
+        formattedResponse += `\n## Description\n\n${descriptionPreview}\n\n`;
         formattedResponse += `\n**Issue link:** [${issue.key}](https://${jiraHost}/browse/${issue.key})\n`;
 
         return {
