@@ -63,19 +63,11 @@ export const JiraCheckUserIssuesRequestSchema = JiraApiRequestSchema.shape({
 export const JiraCreateIssueRequestSchema = JiraApiRequestSchema.shape({
     projectKey: yup.string().required("Project key is required"),
     summary: yup.string().required("Issue summary/title is required"),
-    description: yup.mixed()
-        .test('is-string-or-adf', 'Issue description must be a string or an Atlassian Document Format object', value => {
-            if (typeof value === 'string') return true;
-            if (typeof value === 'object' && value !== null) {
-                return (
-                    'type' in value && value.type === 'doc' &&
-                    'version' in value && value.version === 1 &&
-                    'content' in value && Array.isArray((value as any).content)
-                );
-            }
-            return false;
-        })
-        .required("Issue description is required"),
+    description: yup.object({
+        type: yup.string().oneOf(['doc']).required(),
+        version: yup.number().required(),
+        content: yup.array().required(),
+    }).required('Issue description (ADF) is required'),
     issueType: yup.string().oneOf(['Task', 'Bug', 'Story', 'Epic'], "Issue type must be one of: Task, Bug, Story, Epic").default("Task"),
     assigneeName: yup.string(),
     reporterName: yup.string(),
