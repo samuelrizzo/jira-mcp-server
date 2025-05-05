@@ -65,7 +65,7 @@ export const JiraCreateIssueRequestSchema = JiraApiRequestSchema.shape({
     summary: yup.string().required("Issue summary/title is required"),
     description: yup.object({
         type: yup.string().oneOf(['doc']).required(),
-        version: yup.number().required(),
+        version: yup.number().oneOf([1]).required(),
         content: yup.array().required(),
     }).required('Issue description (ADF) is required'),
     issueType: yup.string().oneOf(['Task', 'Bug', 'Story', 'Epic'], "Issue type must be one of: Task, Bug, Story, Epic").default("Task"),
