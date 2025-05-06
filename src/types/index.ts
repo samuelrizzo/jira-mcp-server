@@ -12,7 +12,11 @@ export interface Project {
     id: string;
     key: string;
     name: string;
-    description?: string;
+    description?: {
+        type: 'doc';
+        version: number;
+        content: any[];
+    };
     lead?: User;
     style?: string;
     url?: string;
@@ -25,7 +29,11 @@ export interface Project {
 export interface IssueType {
     id: string;
     name: string;
-    description?: string;
+    description?: {
+        type: 'doc';
+        version: number;
+        content: any[];
+    };
     subtask?: boolean;
     avatarId?: number;
     iconUrl?: string;
@@ -34,7 +42,11 @@ export interface IssueType {
 export interface Component {
     id: string;
     name: string;
-    description?: string;
+    description?: {
+        type: 'doc';
+        version: number;
+        content: any[];
+    };
     lead?: User;
     assigneeType?: string;
     assignee?: User;
@@ -72,17 +84,25 @@ export interface Issue {
         created?: string;
         updated?: string;
         duedate?: string;
-        description?: string;
+        description?: {
+            type: 'doc';
+            version: number;
+            content: any[];
+        };
         components?: Component[];
         labels?: string[];
-        [key: string]: any; 
+        [key: string]: any;
     };
 }
 
 export interface ProjectRole {
     id: number;
     name: string;
-    description?: string;
+    description?: {
+        type: 'doc';
+        version: number;
+        content: any[];
+    };
     actors?: RoleActor[];
     scope?: {
         type: string;

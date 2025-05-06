@@ -40,11 +40,8 @@ export const createIssueToolDescription = {
                 description: "The title/summary of the issue",
             },
             description: {
-                oneOf: [
-                    { type: "string", description: "Detailed description of the issue (plain text or markdown, will be converted to ADF)" },
-                    { type: "object", description: "ADF (Atlassian Document Format) object, see https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/" }
-                ],
-                description: "Detailed description of the issue. Accepts plain text, markdown, or Atlassian Document Format (ADF) object.",
+                type: "object",
+                description: "ADF (Atlassian Document Format) object, see https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/",
             },
             issueType: {
                 type: "string",
@@ -78,7 +75,7 @@ export const createIssueToolDescription = {
  * @param {string} args.apiToken - API token for authentication
  * @param {string} args.projectKey - The project key
  * @param {string} args.summary - Issue title/summary
- * @param {string|object} args.description - Issue description (plain text, markdown, or Atlassian Document Format object)
+ * @param {object} args.description - Issue description (ADF JSON object, Atlassian Document Format)
  * @param {string} [args.issueType] - Type of issue
  * @param {string} [args.assigneeName] - Name of the assignee
  * @param {string} [args.reporterName] - Name of the reporter
@@ -138,10 +135,10 @@ export async function createIssue(args: any) {
                 });
 
                 if (userResponse.data && userResponse.data.length > 0) {
-                    const assigneeUser = userResponse.data.find((user: any) => 
+                    const assigneeUser = userResponse.data.find((user: any) =>
                         user.displayName.toLowerCase() === assigneeName.toLowerCase()
                     ) || userResponse.data[0];
-                    
+
                     issuePayload.fields.assignee = {
                         id: assigneeUser.accountId
                     };
@@ -165,10 +162,10 @@ export async function createIssue(args: any) {
                 });
 
                 if (userResponse.data && userResponse.data.length > 0) {
-                    const reporterUser = userResponse.data.find((user: any) => 
+                    const reporterUser = userResponse.data.find((user: any) =>
                         user.displayName.toLowerCase() === reporterName.toLowerCase()
                     ) || userResponse.data[0];
-                    
+
                     issuePayload.fields.reporter = {
                         id: reporterUser.accountId
                     };
@@ -188,7 +185,7 @@ export async function createIssue(args: any) {
         });
 
         const createdIssue = response.data;
-        
+
         // Add the issue to a sprint if sprintId is provided
         if (sprintId && createdIssue.id) {
             try {
@@ -243,7 +240,18 @@ export async function createIssue(args: any) {
             formattedResponse += `| Sprint | ${sprintId} |\n`;
         }
 
-        formattedResponse += `\n## Description\n\n${typeof description === 'string' ? description : '[ADF description provided]'}\n\n`;
+        let descriptionPreview = '';
+        if (adfDescription && typeof adfDescription === 'object' && adfDescription.type === 'doc' && Array.isArray(adfDescription.content)) {
+            descriptionPreview = adfDescription.content.map((block: any) => {
+                if (block.type === 'paragraph' && Array.isArray(block.content)) {
+                    return block.content.map((c: any) => c.text).join('');
+                }
+                return '';
+            }).join('\n');
+        } else {
+            descriptionPreview = '[ADF description provided]';
+        }
+        formattedResponse += `\n## Description\n\n${descriptionPreview}\n\n`;
         formattedResponse += `\n**Issue link:** [${issue.key}](https://${jiraHost}/browse/${issue.key})\n`;
 
         return {
