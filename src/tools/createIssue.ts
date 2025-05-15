@@ -259,16 +259,99 @@ export async function createIssue(args: any) {
             isError: false,
         };
     } catch (error: any) {
-        let errorMsg = "An error occurred while creating the issue.";
+        // Extract detailed error information
+        let errorTitle = "Error Creating Jira Issue";
+        let errorMsg = "An unexpected error occurred while creating the issue.";
+        let errorDetails = "";
+        let errorSolution = "";
 
-        if (error.response) {
-            errorMsg = `Error ${error.response.status}: ${JSON.stringify(error.response.data) || error.message}`;
-        } else if (error.message) {
-            errorMsg = error.message;
+        // Handle validation errors (from Yup schema)
+        if (error.name === "ValidationError") {
+            errorTitle = "Validation Error";
+            errorMsg = "The provided data does not meet the requirements for creating a Jira issue.";
+            errorDetails = error.message;
+            errorSolution = "Please check the field requirements and provide all necessary information.";
+        }
+        // Handle authentication/credential errors
+        else if (error.message && error.message.includes("credentials")) {
+            errorTitle = "Authentication Error";
+            errorMsg = "Failed to authenticate with Jira.";
+            errorDetails = error.message;
+            errorSolution = "Please verify your Jira host, email, and API token.";
+        }
+        // Handle user not found errors (assignee/reporter)
+        else if (error.response && error.response.status === 400 && 
+                 (error.response.data?.errors?.assignee || error.response.data?.errors?.reporter)) {
+            errorTitle = "User Not Found Error";
+            errorMsg = "One or more specified users could not be found in Jira.";
+            errorDetails = JSON.stringify(error.response.data.errors, null, 2);
+            errorSolution = "Check that the assignee and reporter names match existing users in your Jira instance.";
+        }
+        // Handle project not found errors
+        else if (error.response && error.response.status === 404 && error.response.data?.errorMessages?.some((msg: string) => msg.includes("project"))) {
+            errorTitle = "Project Not Found Error";
+            errorMsg = `Project with key '${projectKey}' could not be found.`;
+            errorDetails = error.response.data?.errorMessages?.join('\n') || "Project not found or you don't have permission to access it.";
+            errorSolution = "Verify the project key and ensure you have access to the project.";
+        }
+        // Handle permission errors
+        else if (error.response && error.response.status === 403) {
+            errorTitle = "Permission Error";
+            errorMsg = "You don't have permission to create issues in this project.";
+            errorDetails = error.response.data?.errorMessages?.join('\n') || error.message;
+            errorSolution = "Contact your Jira administrator to request the necessary permissions.";
+        }
+        // Handle rate limit errors
+        else if (error.response && error.response.status === 429) {
+            errorTitle = "Rate Limit Exceeded";
+            errorMsg = "Too many requests sent to Jira API.";
+            errorDetails = error.response.data?.errorMessages?.join('\n') || error.message;
+            errorSolution = "Please wait before trying again.";
+        }
+        // Handle sprint errors
+        else if (error.message && error.message.includes("sprint")) {
+            errorTitle = "Sprint Error";
+            errorMsg = "Failed to add issue to the specified sprint.";
+            errorDetails = error.message;
+            errorSolution = "Verify the sprint ID and ensure it is active and associated with the project.";
+        }
+        // Handle any other API response errors
+        else if (error.response) {
+            errorTitle = `API Error (${error.response.status})`;
+            errorMsg = `The Jira API returned an error with status code ${error.response.status}.`;
+            
+            // Try to extract and format the error details
+            try {
+                if (typeof error.response.data === 'object') {
+                    errorDetails = JSON.stringify(error.response.data, null, 2);
+                } else {
+                    errorDetails = error.response.data || error.message;
+                }
+            } catch {
+                errorDetails = error.message || "No additional details available.";
+            }
+            
+            errorSolution = "Check the error details and adjust your request accordingly.";
+        }
+        // Handle network errors
+        else if (error.request) {
+            errorTitle = "Network Error";
+            errorMsg = "Failed to connect to the Jira API.";
+            errorDetails = error.message || "No response received from the server.";
+            errorSolution = "Check your internet connection and verify the Jira host URL.";
+        }
+        // Fallback for any other errors
+        else if (error.message) {
+            errorDetails = error.message;
         }
 
+        // Format the error response in Markdown
+        const formattedError = `# ${errorTitle}\n\n${errorMsg}\n\n`
+            + (errorDetails ? `## Error Details\n\n\`\`\`\n${errorDetails}\n\`\`\`\n\n` : "")
+            + (errorSolution ? `## Solution\n\n${errorSolution}` : "");
+
         return {
-            content: [{ type: "text", text: `# Error\n\n${errorMsg}` }],
+            content: [{ type: "text", text: formattedError }],
             isError: true,
         };
     }
