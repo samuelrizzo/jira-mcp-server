@@ -174,3 +174,22 @@ export interface JiraTransitionPayload {
     /** The transition to be performed. */
     transition: { id: string };
 }
+
+/**
+ * Represents an available transition for a Jira issue.
+ */
+export interface Transition {
+    /** The ID of the transition. */
+    id: string;
+    /** The name of the transition (e.g., "Start Progress", "Close Issue"). */
+    name: string;
+    /** Details about the status the issue will move to if this transition is applied. */
+    to: {
+        /** The name of the target status (e.g., "In Progress", "Done"). */
+        name: string;
+        /** The ID of the target status. */
+        id: string;
+        // Other fields like statusCategory might be present but are not strictly needed for this interface
+    };
+    // Other fields like `hasScreen`, `isGlobal`, etc., might be present
+}
