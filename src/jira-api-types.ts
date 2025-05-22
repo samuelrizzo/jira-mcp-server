@@ -106,3 +106,71 @@ export interface RoleActor {
     };
     emailAddress?: string;
 }
+
+/**
+ * Represents a mark in an Atlassian Document Format (ADF) node.
+ * Marks are used to add formatting like bold, italics, links, etc.
+ */
+export interface ADFMark {
+    /** The type of the mark (e.g., "strong", "em", "link"). */
+    type: string;
+    /** Attributes for the mark, such as the URL for a link. */
+    attrs?: Record<string, any>;
+}
+
+/**
+ * Represents a node in an Atlassian Document Format (ADF) document.
+ * Nodes can be blocks (like paragraphs, headings) or inline (like text, mentions).
+ */
+export interface ADFNode {
+    /** The type of the ADF node (e.g., "paragraph", "text", "mention"). */
+    type: string;
+    /** Attributes for the node, providing additional information. */
+    attrs?: Record<string, any>;
+    /** Child nodes, for nodes that can contain other nodes (e.g., a paragraph containing text nodes). */
+    content?: ADFNode[];
+    /** The textual content of the node, if it's a text node. */
+    text?: string;
+    /** Marks applied to the node, for formatting. */
+    marks?: ADFMark[];
+}
+
+/**
+ * Represents the top-level structure of an Atlassian Document Format (ADF) document.
+ */
+export interface ADFContent {
+    /** The type of the document, always "doc". */
+    type: "doc";
+    /** The version of the ADF schema. */
+    version: 1;
+    /** An array of ADF nodes that make up the content of the document. */
+    content: ADFNode[];
+}
+
+/**
+ * Interface for the 'fields' object within a Jira issue update payload.
+ */
+export interface JiraUpdateIssuePayloadFields {
+    /** The summary of the issue. */
+    summary?: string;
+    /** The description of the issue, in Atlassian Document Format. */
+    description?: ADFContent;
+    /** The assignee of the issue. */
+    assignee?: { accountId: string };
+}
+
+/**
+ * Interface for the main payload when updating a Jira issue.
+ */
+export interface JiraUpdateIssuePayload {
+    /** The fields to be updated in the issue. */
+    fields?: JiraUpdateIssuePayloadFields;
+}
+
+/**
+ * Interface for the payload when transitioning a Jira issue.
+ */
+export interface JiraTransitionPayload {
+    /** The transition to be performed. */
+    transition: { id: string };
+}

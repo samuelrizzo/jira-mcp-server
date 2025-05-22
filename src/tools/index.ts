@@ -37,3 +37,8 @@ export {
     listSprints,
     listSprintsToolDescription
 } from './listSprints.js';
+
+export {
+    updateIssue,
+    updateIssueToolDescription
+} from './updateIssue.js';

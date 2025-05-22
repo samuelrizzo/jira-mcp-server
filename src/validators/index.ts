@@ -161,3 +161,11 @@ export const JiraSprintRequestSchema = JiraApiRequestSchema.shape({
         )
         .default('active'),
 });
+
+/**
+ * Schema for validating Jira update issue requests.
+ * Extends the base API schema with fields needed for updating an issue.
+ * 
+ * @type {yup.ObjectSchema}
+ */
+export { JiraUpdateIssueRequestSchema } from "./jiraUpdateIssueValidator.js";

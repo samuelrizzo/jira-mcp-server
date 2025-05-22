@@ -6,7 +6,8 @@ import {
     listProjectMembers,
     checkUserIssues,
     createIssue,
-    listSprints
+    listSprints,
+    updateIssue
 } from "../tools/index.js";
 import {
     JiraApiRequestSchema,
@@ -15,7 +16,8 @@ import {
     JiraProjectMembersRequestSchema,
     JiraCheckUserIssuesRequestSchema,
     JiraCreateIssueRequestSchema,
-    JiraSprintRequestSchema
+    JiraSprintRequestSchema,
+    JiraUpdateIssueRequestSchema
 } from "../validators/index.js";
 import { validateCredentials } from "../utils/auth.js";
 
@@ -52,6 +54,10 @@ const toolConfigs: Record<string, ToolConfig> = {
     jira_list_sprints: {
         schema: JiraSprintRequestSchema,
         handler: listSprints
+    },
+    jira_update_issue: {
+        schema: JiraUpdateIssueRequestSchema,
+        handler: updateIssue
     }
 };
 
