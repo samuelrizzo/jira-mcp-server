@@ -108,14 +108,27 @@ export interface RoleActor {
 }
 
 /**
+ * Represents the possible types for an ADF attribute value.
+ * It can be a primitive, a nested object of attributes, or an array of attribute values.
+ */
+export type ADFAttributeValue =
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
+    | { [key: string]: ADFAttributeValue }
+    | ADFAttributeValue[];
+
+/**
  * Represents a mark in an Atlassian Document Format (ADF) node.
  * Marks are used to add formatting like bold, italics, links, etc.
  */
 export interface ADFMark {
     /** The type of the mark (e.g., "strong", "em", "link"). */
     type: string;
-    /** Attributes for the mark, such as the URL for a link. */
-    attrs?: Record<string, any>;
+    /** Attributes for the mark, such as the URL for a link. Can be primitives, nested objects, or arrays. */
+    attrs?: Record<string, ADFAttributeValue>;
 }
 
 /**
@@ -125,8 +138,8 @@ export interface ADFMark {
 export interface ADFNode {
     /** The type of the ADF node (e.g., "paragraph", "text", "mention"). */
     type: string;
-    /** Attributes for the node, providing additional information. */
-    attrs?: Record<string, any>;
+    /** Attributes for the node, providing additional information. Can be primitives, nested objects, or arrays. */
+    attrs?: Record<string, ADFAttributeValue>;
     /** Child nodes, for nodes that can contain other nodes (e.g., a paragraph containing text nodes). */
     content?: ADFNode[];
     /** The textual content of the node, if it's a text node. */

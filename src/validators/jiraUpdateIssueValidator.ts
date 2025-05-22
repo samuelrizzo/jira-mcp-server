@@ -27,10 +27,18 @@ export const JiraUpdateIssueRequestSchema = yup.object({
   apiToken: yup.string().optional(),
 
   /**
-   * The ID or key of the Jira issue to be updated (e.g., "PROJECT-123" or "10001").
+   * The ID or key of the Jira issue to be updated.
+   * Must be a valid Jira issue key (e.g., 'PROJ-123', 'TEST_PROJECT-007') or a numeric issue ID (e.g., '10001').
    * This field is required.
+   * @pattern /^[A-Z][A-Z0-9_]+-\d+$|^\d+$/
    */
-  issueIdOrKey: yup.string().required(),
+  issueIdOrKey: yup
+    .string()
+    .required()
+    .matches(
+      /^[A-Z][A-Z0-9_]+-\d+$|^\d+$/,
+      'issueIdOrKey must be a valid Jira issue key (e.g., PROJ-123) or a numeric issue ID.'
+    ),
 
   /**
    * The new summary for the Jira issue.

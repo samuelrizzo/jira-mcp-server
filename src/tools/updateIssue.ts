@@ -103,8 +103,19 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
             }
         }
 
-        // 5. Build Fields Payload
-        fieldsToUpdate = buildJiraUpdateFieldsPayload(
+        // 4. Handle Assignee Update (using new helper)
+        if (validatedArgs.assigneeName) {
+            assigneeAccountId = await handleAssigneeUpdateInternal(
+                axios,
+                jiraHost,
+                authHeader,
+                validatedArgs.assigneeName,
+                updatedFieldsMessages
+            );
+        }
+
+        // 5. Build Fields Payload (using renamed helper)
+        fieldsToUpdate = buildFieldsPayload(
             {
                 summary: validatedArgs.summary,
                 description: validatedArgs.description,
@@ -121,23 +132,16 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
             if (fieldsToUpdate.assignee !== undefined) updatedFieldsMessages.push(`- Assignee updated`); // Generic message, specific name was in warning or not applicable
         }
 
-        // 7. Handle Status Transition
+        // 7. Handle Status Transition (using new helper)
         if (validatedArgs.status) {
-            try {
-                const transitions = await getJiraIssueTransitions(axios, jiraHost, authHeader, validatedArgs.issueIdOrKey);
-                const targetTransition = findTargetTransition(transitions, validatedArgs.status);
-
-                if (targetTransition) {
-                    await postJiraIssueTransition(axios, jiraHost, authHeader, validatedArgs.issueIdOrKey, targetTransition.id);
-                    updatedFieldsMessages.push(`- Status changed to "${targetTransition.to.name}"`);
-                } else {
-                    const availableTransitions = transitions.map(t => t.to.name).join(', ') || "None available";
-                    updatedFieldsMessages.push(`- ⚠️ Warning: Status transition to "${validatedArgs.status}" not available. Available transitions: ${availableTransitions}.`);
-                }
-            } catch (transitionError) {
-                 const transitionErrorMessage = isAxiosErr(transitionError) ? transitionError.message : (transitionError instanceof Error ? transitionError.message : "Unknown error during status transition");
-                 updatedFieldsMessages.push(`- ⚠️ Warning: Error during status transition: ${transitionErrorMessage}.`);
-            }
+            await handleStatusUpdateInternal(
+                axios,
+                jiraHost,
+                authHeader,
+                validatedArgs.issueIdOrKey,
+                validatedArgs.status,
+                updatedFieldsMessages
+            );
         }
         
         // 8. Check if any action was performed or attempted
@@ -157,8 +161,8 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
         // 9. Fetch Updated Issue Details
         const updatedIssue = await fetchJiraIssueDetails(axios, jiraHost, authHeader, validatedArgs.issueIdOrKey);
 
-        // 10. Format Success Response
-        const successMessage = formatSuccessResponseMessage(updatedIssue, updatedFieldsMessages, jiraHost);
+        // 10. Format Success Response (using renamed helper)
+        const successMessage = formatSuccessResponse(updatedIssue, updatedFieldsMessages, jiraHost);
         return {
             content: [{ type: "text", text: successMessage }],
             isError: false,
@@ -170,7 +174,7 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
         const finalIssueIdOrKey = issueIdOrKeyForErrorContext || (typeof args.issueIdOrKey === 'string' ? args.issueIdOrKey : "N/A");
         const finalJiraHost = jiraHostForErrorContext || (typeof args.jiraHost === 'string' && args.jiraHost) || process.env.JIRA_HOST || "N/A";
         
-        return mapErrorToResponseFormat(
+        return mapErrorToResponse( // Renamed
             error,
             yup, 
             isAxiosErr, 
@@ -183,6 +187,63 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
 
 // --- Helper Functions --- 
 // (These functions were defined in the previous step and are part of this file)
+
+/**
+ * Handles the assignee update process.
+ * Searches for the user and updates messages array.
+ * @returns The assignee's account ID if found and active, otherwise undefined.
+ */
+async function handleAssigneeUpdateInternal(
+  axiosInstance: AxiosStatic,
+  jiraHost: string,
+  authHeader: string,
+  assigneeName: string,
+  updatedFieldsMessages: string[]
+): Promise<string | undefined> {
+  try {
+    const assignee = await searchJiraUser(axiosInstance, jiraHost, authHeader, assigneeName);
+    if (assignee) {
+      // Message about successful assignment will be added after the actual update in the main function
+      return assignee.accountId;
+    } else {
+      updatedFieldsMessages.push(`- ⚠️ Warning: Assignee '${assigneeName}' not found or not active. Assignee not changed.`);
+      return undefined;
+    }
+  } catch (searchError) {
+    const searchErrorMessage = isAxiosErr(searchError) ? searchError.message : (searchError instanceof Error ? searchError.message : "Unknown error during assignee search");
+    updatedFieldsMessages.push(`- ⚠️ Warning: Error searching for assignee '${assigneeName}': ${searchErrorMessage}. Assignee not changed.`);
+    return undefined;
+  }
+}
+
+/**
+ * Handles the status update process.
+ * Fetches transitions, finds the target, and posts the transition.
+ */
+async function handleStatusUpdateInternal(
+  axiosInstance: AxiosStatic,
+  jiraHost: string,
+  authHeader: string,
+  issueIdOrKey: string,
+  targetStatusName: string,
+  updatedFieldsMessages: string[]
+): Promise<void> {
+  try {
+    const transitions = await getJiraIssueTransitions(axiosInstance, jiraHost, authHeader, issueIdOrKey);
+    const targetTransition = findTargetTransition(transitions, targetStatusName);
+
+    if (targetTransition) {
+      await postJiraIssueTransition(axiosInstance, jiraHost, authHeader, issueIdOrKey, targetTransition.id);
+      updatedFieldsMessages.push(`- Status changed to "${targetTransition.to.name}".`);
+    } else {
+      const availableTransitions = transitions.map(t => t.to.name).join(', ') || "None available";
+      updatedFieldsMessages.push(`- ⚠️ Warning: Status transition to "${targetStatusName}" not available or already in this state. Available transitions: ${availableTransitions}.`);
+    }
+  } catch (transitionError) {
+    const transitionErrorMessage = isAxiosErr(transitionError) ? transitionError.message : (transitionError instanceof Error ? transitionError.message : "Unknown error during status transition");
+    updatedFieldsMessages.push(`- ⚠️ Warning: Error during status transition: ${transitionErrorMessage}.`);
+  }
+}
 
 /**
  * Extracts Jira credentials from arguments or environment variables, validates them,
@@ -245,7 +306,7 @@ export async function searchJiraUser( // Added export
  * @param adfConverter - Function to convert string or ADFContent to ADFContent.
  * @returns The JiraUpdateIssuePayloadFields object.
  */
-export function buildJiraUpdateFieldsPayload( // Added export
+export function buildFieldsPayload( // Renamed
   args: { summary?: string; description?: string | ADFContent; assigneeAccountId?: string },
   adfConverter: (desc: string | ADFContent) => ADFContent
 ): JiraUpdateIssuePayloadFields {
@@ -364,7 +425,7 @@ export async function fetchJiraIssueDetails( // Added export
  * @param jiraHost - The Jira host URL.
  * @returns A formatted Markdown string for the success message.
  */
-export function formatSuccessResponseMessage( // Added export
+export function formatSuccessResponse( // Renamed
   updatedIssue: Issue,
   updatedFieldsMessages: string[],
   jiraHost: string
@@ -395,7 +456,7 @@ export function formatSuccessResponseMessage( // Added export
  * @param jiraHostForContext - Optional jiraHost to provide context in error messages.
  * @returns An error response object with content and isError: true.
  */
-export function mapErrorToResponseFormat( // Added export
+export function mapErrorToResponse( // Renamed
   error: unknown,
   yupInstance: typeof yup,
   isAxiosErrFn: typeof isAxiosErr,

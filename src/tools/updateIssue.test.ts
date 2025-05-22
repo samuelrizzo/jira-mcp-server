@@ -1,14 +1,14 @@
 import axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { updateIssue } from './updateIssue.js';
-import { JiraUpdateIssueRequestSchema } from '../validators/index.js'; // For arg types
-import { ADFContent, Issue, User } from '../jira-api-types.js';
-import * as authUtils from '../utils/auth.js';
+import { updateIssue } from './updateIssue'; // Removed .js
+import { JiraUpdateIssueRequestSchema } from '../validators/index'; // Removed .js
+import { ADFContent, Issue, User } from '../jira-api-types'; // Removed .js
+import * as authUtils from '../utils/auth'; // Removed .js
 
-import { CredentialsError } from '../types/index.js';
+import { CredentialsError } from '../types/index'; // Removed .js
 
 // Mock utilities
-jest.mock('../utils/auth.js', () => ({
+jest.mock('../utils/auth', () => ({ // Removed .js
   validateCredentials: jest.fn(), // Default mock, can be overridden per test
   createAuthHeader: jest.fn(() => ({ Authorization: 'Basic MOCKED_TOKEN' })),
 }));
@@ -337,10 +337,218 @@ describe('updateIssue Tool', () => {
     });
   });
 
-  describe('ADF Description Validation (JiraUpdateIssueRequestSchema)', () => {
-    const baseValidArgs = { issueIdOrKey: 'TEST-1' }; // Only required fields for schema testing
+  describe('JiraUpdateIssueRequestSchema Validations', () => { // Renamed describe block for broader scope
+    
+    // --- issueIdOrKey Validation Tests ---
+    describe('issueIdOrKey field', () => {
+      const baseArgs = { summary: 'Test summary' }; // Other fields to make the schema happy, issueIdOrKey is what we test
 
-    it('should pass with a valid simple ADF object', () => {
+      // Valid formats
+      ['PROJ-1', 'TESTPROJ-123', 'MY_PROJ-007', 'P1-1', 'TEST_PROJECT_A-99'].forEach(validKey => {
+        it(`should pass for valid Jira key: ${validKey}`, () => {
+          expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseArgs, issueIdOrKey: validKey })).toBe(true);
+        });
+      });
+
+      ['1', '10001', '987654321'].forEach(validId => {
+        it(`should pass for valid numeric ID: ${validId}`, () => {
+          expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseArgs, issueIdOrKey: validId })).toBe(true);
+        });
+      });
+
+      // Invalid formats
+      const invalidFormats = [
+        { key: 'proj-123', desc: 'lowercase project key' },
+        { key: 'PROJ123',  desc: 'project key without hyphen' },
+        { key: 'PROJ!-123',desc: 'project key with invalid special chars' },
+        { key: 'PROJ-',    desc: 'no number after hyphen' },
+        { key: 'ABC',      desc: 'non-numeric ID and not a key format' },
+        { key: '',         desc: 'empty string' }, // Also tests .required() implicitly
+        { key: 'PROJ-ABC', desc: 'hyphenated but not valid key (non-numeric issue number)' },
+        { key: '123-PROJ', desc: 'invalid key format (number first)' },
+        { key: 'A-1',      desc: 'project key too short (if we assume min 2 chars for project)'}, // Regex allows this, but Jira usually has longer keys. Current regex is fine.
+        { key: 'PROJECT_KEY_WITH_lowercase-123', desc: 'lowercase in project key part' }
+      ];
+
+      invalidFormats.forEach(invalidCase => {
+        it(`should fail for invalid format: ${invalidCase.key} (${invalidCase.desc})`, async () => {
+          const testData = { ...baseArgs, issueIdOrKey: invalidCase.key };
+          expect(JiraUpdateIssueRequestSchema.isValidSync(testData)).toBe(false);
+          await expect(JiraUpdateIssueRequestSchema.validate(testData))
+            .rejects
+            .toThrow('issueIdOrKey must be a valid Jira issue key (e.g., PROJ-123) or a numeric issue ID.');
+        });
+      });
+       it('should fail if issueIdOrKey is missing (required check)', async () => {
+          const testData = { ...baseArgs }; // issueIdOrKey is missing
+          expect(JiraUpdateIssueRequestSchema.isValidSync(testData)).toBe(false);
+          await expect(JiraUpdateIssueRequestSchema.validate(testData))
+            .rejects
+            .toThrow('issueIdOrKey is a required field');
+      });
+    });
+
+    // --- ADF Description Validation Tests (Existing) ---
+    describe('description field (ADF)', () => {
+        const baseValidArgs = { issueIdOrKey: 'TEST-1' }; // Valid issueIdOrKey for these tests
+        
+        it('should pass with a valid simple ADF object', () => {
+        const description: ADFContent = {
+            type: 'doc', version: 1,
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }],
+        };
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(true);
+        });
+
+        it('should pass with a valid ADF object with nested content', () => {
+        const description: ADFContent = {
+            type: 'doc', version: 1,
+            content: [
+            {
+                type: 'blockquote',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Quoted' }] }],
+            },
+            ],
+        };
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(true);
+        });
+
+        it('should pass with an empty content array in the main doc', () => {
+        const description: ADFContent = { type: 'doc', version: 1, content: [] };
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(true);
+        });
+
+        it('should pass with an empty content array in a nested node', () => {
+        const description: ADFContent = {
+            type: 'doc', version: 1,
+            content: [{ type: 'paragraph', content: [] }],
+        };
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(true);
+        });
+        
+        it('should pass with a description as a plain string', () => {
+        const description = "This is a plain string description.";
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(true);
+        });
+
+        it('should pass if description is undefined', () => {
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description: undefined })).toBe(true);
+        });
+
+        // --- Invalid ADF Structures ---
+
+        it('should fail if content array contains a non-object node', async () => {
+        const description = {
+            type: 'doc', version: 1,
+            content: ["not an object"], // Invalid node
+        };
+        await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+            .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if a node is missing the "type" property', async () => {
+        const description = {
+            type: 'doc', version: 1,
+            content: [{ content: [{ type: 'text', text: 'valid' }] } as any], // Missing 'type' in outer node
+        };
+        await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+            .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if a node has an empty string "type"', async () => {
+        const description = {
+            type: 'doc', version: 1,
+            content: [{ type: '', content: [{ type: 'text', text: 'valid' }] }],
+        };
+        await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+            .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+        
+        it('should fail if a node has a non-string "type"', async () => {
+            const description = {
+                type: 'doc', version: 1,
+                content: [{ type: 123, content: [{ type: 'text', text: 'valid' }] } as any],
+            };
+            await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+                .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+            expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if a nested node has an invalid "type" (e.g. empty string)', async () => {
+        const description = {
+            type: 'doc', version: 1,
+            content: [{ type: 'paragraph', content: [{ type: '' }] }], // Nested node with invalid type
+        };
+        await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+            .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if a node has a "content" property that is not an array', async () => {
+        const description = {
+            type: 'doc', version: 1,
+            content: [{ type: 'paragraph', content: "not an array" as any }],
+        };
+        await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+            .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+        expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+        
+        it('should fail if the main ADF object is missing "type"', async () => {
+            const description = {
+                version: 1,
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello'}] }]
+            } as any;
+            await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+                .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+            expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if the main ADF object has incorrect "type"', async () => {
+            const description = {
+                type: 'not-doc', version: 1,
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello'}] }]
+            } as any;
+            await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+                .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+            expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if the main ADF object is missing "version"', async () => {
+            const description = {
+                type: 'doc',
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello'}] }]
+            } as any;
+            await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+                .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+            expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+
+        it('should fail if the main ADF object has incorrect "version"', async () => {
+            const description = {
+                type: 'doc', version: 2, // Invalid version
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello'}] }]
+            } as any;
+            await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+                .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+            expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+        
+        it('should fail if the main ADF object "content" is not an array', async () => {
+            const description = {
+                type: 'doc', version: 1,
+                content: "this should be an array"
+            } as any;
+            await expect(JiraUpdateIssueRequestSchema.validate({ ...baseValidArgs, description }))
+                .rejects.toThrow('Description must be a string or a valid ADF object (with valid node structure)');
+            expect(JiraUpdateIssueRequestSchema.isValidSync({ ...baseValidArgs, description })).toBe(false);
+        });
+    });    
+  });
+});
       const description: ADFContent = {
         type: 'doc', version: 1,
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }],
