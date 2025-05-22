@@ -106,16 +106,16 @@ export const JiraCreateIssueRequestSchema = JiraApiRequestSchema.shape({
         .max(255, "Issue title must be at most 255 characters long"),
     description: yup.object({
         type: yup.string()
-            .oneOf(['doc'], 'ADF document type must be "doc"')
-            .required('ADF document type is required'),
+            .oneOf(['doc'], 'ADF document type must be "doc". Use: {"type": "doc", ...}')
+            .required('ADF document type is required. Add "type": "doc" to your description object'),
         version: yup.number()
-            .oneOf([1], 'ADF document version must be 1')
-            .required('ADF document version is required'),
+            .oneOf([1], 'ADF document version must be 1. Use: {"version": 1, ...}')
+            .required('ADF document version is required. Add "version": 1 to your description object'),
         content: yup.array()
-            .required('ADF document content is required')
-            .min(1, 'ADF document cannot be empty'),
-    }).required('Issue description (in ADF format) is required')
-        .typeError('Description must be in ADF (Atlassian Document Format)'),
+            .required('ADF document content is required. Add "content": [...] array to your description object')
+            .min(1, 'ADF document content cannot be empty. Include at least one paragraph in the content array'),
+    }).required('Issue description (in ADF format) is required. Use this format: {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Your text here"}]}]}')
+        .typeError('❌ CRITICAL: Description must be an ADF object, NOT a string! Use: {"type": "doc", "version": 1, "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Your description text"}]}]}'),
     issueType: yup.string()
         .oneOf(
             ['Task', 'Bug', 'Story', 'Epic'],

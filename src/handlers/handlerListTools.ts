@@ -128,8 +128,8 @@ export async function handleListTools(request: any) {
                             description: "The title/summary of the issue",
                         },
                         description: {
-                            type: "string",
-                            description: "Detailed description of the issue",
+                            type: "object",
+                            description: "Issue description in ADF (Atlassian Document Format). REQUIRED: Must be an object with structure: {\"type\": \"doc\", \"version\": 1, \"content\": [{\"type\": \"paragraph\", \"content\": [{\"type\": \"text\", \"text\": \"Your description text\"}]}]}",
                         },
                         issueType: {
                             type: "string",
