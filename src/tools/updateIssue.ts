@@ -3,15 +3,11 @@ import * as yup from 'yup';
 import { JiraUpdateIssueRequestSchema } from '../validators/index.js';
 import { createAuthHeader, validateCredentials } from '../utils/auth.js';
 import { toADF } from '../utils/adfUtils.js';
-import { ADFContent, JiraUpdateIssuePayload, JiraTransitionPayload, User, Issue } from '../jira-api-types.js';
+import { ADFContent, JiraUpdateIssuePayload, JiraTransitionPayload, User, Issue, JiraUpdateIssuePayloadFields, JiraErrorResponseData } from '../jira-api-types.js'; // Added JiraErrorResponseData
 import { KnownError, CredentialsError } from '../types/index.js';
 import { isAxiosErr } from '../utils/index.js';
 import { AxiosStatic } from 'axios'; // For axiosInstance type
 import { Transition } from '../jira-api-types.js'; // Ensure this is imported
-
-// Helper Function Implementations will start here
-// Note: For brevity, the helper functions defined in the previous step are assumed to be below this main function.
-// The actual helper functions are already part of the file from the previous step.
 
 /**
  * Describes the `jira_update_issue` tool for updating existing Jira issues.
@@ -86,23 +82,6 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
         let fieldsToUpdate: JiraUpdateIssuePayloadFields;
         let assigneeAccountId: string | undefined;
 
-        // 4. Handle Assignee Update
-        if (validatedArgs.assigneeName) {
-            try {
-                const assignee = await searchJiraUser(axios, jiraHost, authHeader, validatedArgs.assigneeName);
-                if (assignee) {
-                    assigneeAccountId = assignee.accountId;
-                    // Message will be added after successful field update
-                } else {
-                    updatedFieldsMessages.push(`- ⚠️ Warning: Assignee '${validatedArgs.assigneeName}' not found or not active. Assignee not changed.`);
-                }
-            } catch (searchError) {
-                // Log or handle user search error specifically if needed, then add warning
-                const searchErrorMessage = isAxiosErr(searchError) ? searchError.message : (searchError instanceof Error ? searchError.message : "Unknown error during assignee search");
-                updatedFieldsMessages.push(`- ⚠️ Warning: Error searching for assignee '${validatedArgs.assigneeName}': ${searchErrorMessage}. Assignee not changed.`);
-            }
-        }
-
         // 4. Handle Assignee Update (using new helper)
         if (validatedArgs.assigneeName) {
             assigneeAccountId = await handleAssigneeUpdateInternal(
@@ -145,14 +124,12 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
         }
         
         // 8. Check if any action was performed or attempted
-        // If no fields were to be updated AND no status was provided AND no assignee search was attempted (which would produce a message)
         if (Object.keys(fieldsToUpdate).length === 0 && !validatedArgs.status && !validatedArgs.assigneeName) {
              return {
                 content: [{ type: "text", text: "No update parameters provided. No changes made to the issue." }],
                 isError: false, 
             };
         }
-        // If messages array is empty at this point, it means only assigneeName was provided but not found, and no other changes.
         if (updatedFieldsMessages.length === 0 && validatedArgs.assigneeName && Object.keys(fieldsToUpdate).length === 0 && !validatedArgs.status){
              updatedFieldsMessages.push(`- ⚠️ Warning: Assignee '${validatedArgs.assigneeName}' not found or not active. No other updates performed.`);
         }
@@ -170,11 +147,10 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
 
     } catch (error: unknown) {
         // 11. Format Error Response
-        // Use the captured context or fallback to args/env
         const finalIssueIdOrKey = issueIdOrKeyForErrorContext || (typeof args.issueIdOrKey === 'string' ? args.issueIdOrKey : "N/A");
         const finalJiraHost = jiraHostForErrorContext || (typeof args.jiraHost === 'string' && args.jiraHost) || process.env.JIRA_HOST || "N/A";
         
-        return mapErrorToResponse( // Renamed
+        return mapErrorToResponse( 
             error,
             yup, 
             isAxiosErr, 
@@ -186,13 +162,7 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
 }
 
 // --- Helper Functions --- 
-// (These functions were defined in the previous step and are part of this file)
 
-/**
- * Handles the assignee update process.
- * Searches for the user and updates messages array.
- * @returns The assignee's account ID if found and active, otherwise undefined.
- */
 async function handleAssigneeUpdateInternal(
   axiosInstance: AxiosStatic,
   jiraHost: string,
@@ -203,7 +173,6 @@ async function handleAssigneeUpdateInternal(
   try {
     const assignee = await searchJiraUser(axiosInstance, jiraHost, authHeader, assigneeName);
     if (assignee) {
-      // Message about successful assignment will be added after the actual update in the main function
       return assignee.accountId;
     } else {
       updatedFieldsMessages.push(`- ⚠️ Warning: Assignee '${assigneeName}' not found or not active. Assignee not changed.`);
@@ -216,10 +185,6 @@ async function handleAssigneeUpdateInternal(
   }
 }
 
-/**
- * Handles the status update process.
- * Fetches transitions, finds the target, and posts the transition.
- */
 async function handleStatusUpdateInternal(
   axiosInstance: AxiosStatic,
   jiraHost: string,
@@ -245,15 +210,7 @@ async function handleStatusUpdateInternal(
   }
 }
 
-/**
- * Extracts Jira credentials from arguments or environment variables, validates them,
- * and returns them along with an authentication header.
- * @param args - The validated arguments from the JiraUpdateIssueRequestSchema.
- * @param env - The Node.js process environment.
- * @returns An object containing jiraHost, email, apiToken, and authHeader.
- * @throws {CredentialsError} If credentials are not valid.
- */
-export function getJiraCredentials( // Added export
+export function getJiraCredentials( 
   args: yup.InferType<typeof JiraUpdateIssueRequestSchema>,
   env: NodeJS.ProcessEnv
 ): { jiraHost: string; email: string; apiToken: string; authHeader: string } {
@@ -261,23 +218,13 @@ export function getJiraCredentials( // Added export
   const email = args.email || env.JIRA_EMAIL;
   const apiToken = args.apiToken || env.JIRA_API_TOKEN;
 
-  validateCredentials(jiraHost, email, apiToken); // Throws CredentialsError if invalid
+  validateCredentials(jiraHost, email, apiToken); 
 
-  // At this point, validateCredentials has confirmed they are strings
   const authHeader = createAuthHeader(email!, apiToken!);
   return { jiraHost: jiraHost!, email: email!, apiToken: apiToken!, authHeader };
 }
 
-/**
- * Searches for a Jira user by their display name or account ID.
- * Prefers an exact, active match on displayName, otherwise takes the first active user.
- * @param axiosInstance - The Axios instance for making HTTP requests.
- * @param jiraHost - The Jira host URL.
- * @param authHeader - The authentication header.
- * @param userName - The display name or account ID of the user to search for.
- * @returns A promise that resolves to the User object or undefined if not found.
- */
-export async function searchJiraUser( // Added export
+export async function searchJiraUser( 
   axiosInstance: AxiosStatic,
   jiraHost: string,
   authHeader: string,
@@ -285,48 +232,31 @@ export async function searchJiraUser( // Added export
 ): Promise<User | undefined> {
   const response = await axiosInstance.get<User[]>(
     `https://${jiraHost}/rest/api/3/user/search?query=${encodeURIComponent(userName)}`,
-    { headers: { ...authHeader, 'Accept': 'application/json' } }
+    { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } }
   );
 
   if (!response.data || response.data.length === 0) return undefined;
 
-  // Prefer exact match on displayName (case-insensitive for robustness) for active users
   const exactMatch = response.data.find(
     u => u.displayName?.toLowerCase() === userName.toLowerCase() && u.active
   );
   if (exactMatch) return exactMatch;
 
-  // Fallback: return the first active user if no exact displayName match
   return response.data.find(u => u.active);
 }
 
-/**
- * Builds the 'fields' part of the Jira issue update payload.
- * @param args - Object containing optional summary, description, and assigneeAccountId.
- * @param adfConverter - Function to convert string or ADFContent to ADFContent.
- * @returns The JiraUpdateIssuePayloadFields object.
- */
-export function buildFieldsPayload( // Renamed
+export function buildFieldsPayload( 
   args: { summary?: string; description?: string | ADFContent; assigneeAccountId?: string },
   adfConverter: (desc: string | ADFContent) => ADFContent
 ): JiraUpdateIssuePayloadFields {
   const fieldsToUpdate: JiraUpdateIssuePayloadFields = {};
-  if (args.summary !== undefined) fieldsToUpdate.summary = args.summary; // Allow empty string for summary
+  if (args.summary !== undefined) fieldsToUpdate.summary = args.summary; 
   if (args.description !== undefined) fieldsToUpdate.description = adfConverter(args.description);
   if (args.assigneeAccountId) fieldsToUpdate.assignee = { accountId: args.assigneeAccountId };
   return fieldsToUpdate;
 }
 
-/**
- * Updates the specified fields on a Jira issue.
- * @param axiosInstance - The Axios instance.
- * @param jiraHost - The Jira host URL.
- * @param authHeader - The authentication header.
- * @param issueIdOrKey - The ID or key of the issue to update.
- * @param fieldsPayload - The payload containing the fields to update.
- * @returns A promise that resolves when the update is complete.
- */
-export async function updateJiraIssueFields( // Added export
+export async function updateJiraIssueFields( 
   axiosInstance: AxiosStatic,
   jiraHost: string,
   authHeader: string,
@@ -336,19 +266,11 @@ export async function updateJiraIssueFields( // Added export
   await axiosInstance.put(
     `https://${jiraHost}/rest/api/3/issue/${issueIdOrKey}`,
     { fields: fieldsPayload },
-    { headers: { ...authHeader, 'Accept': 'application/json', 'Content-Type': 'application/json' } }
+    { headers: { 'Authorization': authHeader, 'Accept': 'application/json', 'Content-Type': 'application/json' } }
   );
 }
 
-/**
- * Fetches the available transitions for a Jira issue.
- * @param axiosInstance - The Axios instance.
- * @param jiraHost - The Jira host URL.
- * @param authHeader - The authentication header.
- * @param issueIdOrKey - The ID or key of the issue.
- * @returns A promise that resolves to an array of available transitions.
- */
-export async function getJiraIssueTransitions( // Added export
+export async function getJiraIssueTransitions( 
   axiosInstance: AxiosStatic,
   jiraHost: string,
   authHeader: string,
@@ -356,34 +278,19 @@ export async function getJiraIssueTransitions( // Added export
 ): Promise<Transition[]> {
   const response = await axiosInstance.get<{ transitions: Transition[] }>(
     `https://${jiraHost}/rest/api/3/issue/${issueIdOrKey}/transitions`,
-    { headers: { ...authHeader, 'Accept': 'application/json' } }
+    { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } }
   );
-  return response.data.transitions || []; // Ensure an array is always returned
+  return response.data.transitions || []; 
 }
 
-/**
- * Finds a target transition from a list of available transitions based on the target status name.
- * @param transitions - An array of available transitions.
- * @param targetStatusName - The name of the desired target status.
- * @returns The matching Transition object or undefined if not found.
- */
-export function findTargetTransition( // Added export
+export function findTargetTransition( 
   transitions: Transition[],
   targetStatusName: string
 ): Transition | undefined {
   return transitions.find(t => t.to.name.toLowerCase() === targetStatusName.toLowerCase());
 }
 
-/**
- * Applies a transition to a Jira issue.
- * @param axiosInstance - The Axios instance.
- * @param jiraHost - The Jira host URL.
- * @param authHeader - The authentication header.
- * @param issueIdOrKey - The ID or key of the issue.
- * @param transitionId - The ID of the transition to apply.
- * @returns A promise that resolves when the transition is complete.
- */
-export async function postJiraIssueTransition( // Added export
+export async function postJiraIssueTransition( 
   axiosInstance: AxiosStatic,
   jiraHost: string,
   authHeader: string,
@@ -393,19 +300,11 @@ export async function postJiraIssueTransition( // Added export
   await axiosInstance.post(
     `https://${jiraHost}/rest/api/3/issue/${issueIdOrKey}/transitions`,
     { transition: { id: transitionId } } as JiraTransitionPayload,
-    { headers: { ...authHeader, 'Accept': 'application/json', 'Content-Type': 'application/json' } }
+    { headers: { 'Authorization': authHeader, 'Accept': 'application/json', 'Content-Type': 'application/json' } }
   );
 }
 
-/**
- * Fetches the full details of a Jira issue.
- * @param axiosInstance - The Axios instance.
- * @param jiraHost - The Jira host URL.
- * @param authHeader - The authentication header.
- * @param issueIdOrKey - The ID or key of the issue.
- * @returns A promise that resolves to the Issue object.
- */
-export async function fetchJiraIssueDetails( // Added export
+export async function fetchJiraIssueDetails( 
   axiosInstance: AxiosStatic,
   jiraHost: string,
   authHeader: string,
@@ -413,19 +312,12 @@ export async function fetchJiraIssueDetails( // Added export
 ): Promise<Issue> {
   const response = await axiosInstance.get<Issue>(
     `https://${jiraHost}/rest/api/3/issue/${issueIdOrKey}`,
-    { headers: { ...authHeader, 'Accept': 'application/json' } }
+    { headers: { 'Authorization': authHeader, 'Accept': 'application/json' } }
   );
   return response.data;
 }
 
-/**
- * Formats the success response message after updating an issue.
- * @param updatedIssue - The updated Issue object.
- * @param updatedFieldsMessages - An array of messages detailing what was updated.
- * @param jiraHost - The Jira host URL.
- * @returns A formatted Markdown string for the success message.
- */
-export function formatSuccessResponse( // Renamed
+export function formatSuccessResponse( 
   updatedIssue: Issue,
   updatedFieldsMessages: string[],
   jiraHost: string
@@ -446,23 +338,13 @@ export function formatSuccessResponse( // Renamed
   return formattedResponse;
 }
 
-/**
- * Maps an error to the standard response format for the tool.
- * @param error - The error object (unknown type).
- * @param yupInstance - The yup library instance (for instanceof check).
- * @param isAxiosErrFn - The type guard function for AxiosError.
- * @param CredentialsErrorType - The CredentialsError class (for instanceof check).
- * @param issueIdOrKeyForContext - Optional issueIdOrKey to provide context in error messages.
- * @param jiraHostForContext - Optional jiraHost to provide context in error messages.
- * @returns An error response object with content and isError: true.
- */
-export function mapErrorToResponse( // Renamed
+export function mapErrorToResponse( 
   error: unknown,
   yupInstance: typeof yup,
   isAxiosErrFn: typeof isAxiosErr,
   CredentialsErrorType: typeof CredentialsError,
-  issueIdOrKeyForContext?: string, // Added for better context in messages
-  jiraHostForContext?: string // Added for better context in messages
+  issueIdOrKeyForContext?: string, 
+  jiraHostForContext?: string 
 ): { content: {type: "text", text: string}[], isError: true } {
     let errorTitle = "Error Updating Jira Issue";
     let errorCode = "UNKNOWN_ERROR";
@@ -484,10 +366,33 @@ export function mapErrorToResponse( // Renamed
     } else if (isAxiosErrFn(error)) {
       if (error.response) {
         const { status, data } = error.response;
-        const jiraErrors = data?.errorMessages?.join(', ') || (data?.errors ? JSON.stringify(data.errors) : '');
+        // Cast data to the defined interface
+        const responseData = data as JiraErrorResponseData; 
+        
+        let jiraErrors = "";
+        if (responseData?.errorMessages && Array.isArray(responseData.errorMessages)) {
+            jiraErrors = responseData.errorMessages.join(', ');
+        } else if (responseData?.errors) {
+            if (typeof responseData.errors === 'object' && responseData.errors !== null && !Array.isArray(responseData.errors)) {
+                try {
+                    jiraErrors = JSON.stringify(responseData.errors);
+                } catch (e) {
+                    jiraErrors = "Could not stringify Jira field errors.";
+                }
+            } else if (Array.isArray(responseData.errors) && responseData.errors.every(e => typeof e === 'string')) {
+                jiraErrors = responseData.errors.join(', ');
+            } else if (Array.isArray(responseData.errors)) {
+                try {
+                    jiraErrors = JSON.stringify(responseData.errors);
+                } catch (e) {
+                     jiraErrors = "Could not stringify Jira errors array.";
+                }
+            }
+        }
+
         errorTitle = `Jira API Error (${status})`;
         errorMessage = `The Jira API returned an error: ${jiraErrors || error.message}`;
-        errorDetails = `Response Data: ${JSON.stringify(data, null, 2)}`;
+        errorDetails = `Response Data: ${JSON.stringify(data, null, 2)}`; 
         
         switch (status) {
           case 400: errorCode = "JIRA_BAD_REQUEST"; errorSolution = "The request was malformed. Check the provided parameters."; break;

@@ -1,4 +1,4 @@
-import { ADFContent, ADFNode } from "../jira-api-types";
+import { ADFContent, ADFNode } from "../jira-api-types.js"; // Added .js
 
 /**
  * Utility to ensure the description field is in Atlassian Document Format (ADF).

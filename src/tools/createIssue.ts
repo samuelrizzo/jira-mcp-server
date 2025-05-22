@@ -2,6 +2,37 @@ import axios from "axios";
 import { JiraCreateIssueRequestSchema } from "../validators/index.js";
 import { createAuthHeader, validateCredentials } from "../utils/auth.js";
 import { toADF } from "../utils/adfUtils.js";
+import { ADFContent, User } from '../jira-api-types.js'; // Added ADFContent, User
+
+/**
+ * Interface for the 'assignee' or 'reporter' field in a Jira issue payload.
+ */
+interface JiraIssueUserField {
+  id: string;
+}
+
+/**
+ * Interface for the 'fields' object within a Jira issue creation payload.
+ */
+interface CreateIssuePayloadFields {
+  project: { key: string };
+  summary: string;
+  description: ADFContent; // Use the imported ADFContent
+  issuetype: { name: string };
+  assignee?: JiraIssueUserField;
+  reporter?: JiraIssueUserField;
+  // Add other potential custom fields if they are ever part of this payload
+  // For now, keep it to what's in the existing issuePayload
+  // sprintId is handled separately after issue creation for some Jira versions
+}
+
+/**
+ * Interface for the main payload when creating a Jira issue.
+ */
+interface CreateIssuePayload {
+  fields: CreateIssuePayloadFields;
+}
+
 
 /**
  * Description object for the Jira create issue tool
@@ -39,9 +70,9 @@ export const createIssueToolDescription = {
                 type: "string",
                 description: "The title/summary of the issue",
             },
-            description: {
-                type: "object",
-                description: "ADF (Atlassian Document Format) object, see https://developer.atlassian.com/cloud/jira/platform/apis/document/structure/",
+            description: { // Input description can be string or ADF
+                type: ["object", "string"], // Allow string for initial input
+                description: "The description for the Jira issue. Can be a plain string or an Atlassian Document Format (ADF) object.",
             },
             issueType: {
                 type: "string",
@@ -75,7 +106,7 @@ export const createIssueToolDescription = {
  * @param {string} args.apiToken - API token for authentication
  * @param {string} args.projectKey - The project key
  * @param {string} args.summary - Issue title/summary
- * @param {object} args.description - Issue description (ADF JSON object, Atlassian Document Format)
+ * @param {string | ADFContent} args.description - Issue description (string or ADF JSON object)
  * @param {string} [args.issueType] - Type of issue
  * @param {string} [args.assigneeName] - Name of the assignee
  * @param {string} [args.reporterName] - Name of the reporter
@@ -91,8 +122,8 @@ export async function createIssue(args: any) {
     const apiToken = validatedArgs.apiToken || process.env.JIRA_API_TOKEN;
     const projectKey = validatedArgs.projectKey;
     const summary = validatedArgs.summary;
-    const description = validatedArgs.description;
-    const adfDescription = toADF(description);
+    // The input 'description' can be string or ADFContent. toADF handles both.
+    const adfDescription = toADF(validatedArgs.description); 
     const issueType = validatedArgs.issueType || "Task";
     const assigneeName = validatedArgs.assigneeName;
     const reporterName = validatedArgs.reporterName;
@@ -107,14 +138,13 @@ export async function createIssue(args: any) {
     const authHeader = createAuthHeader(email, apiToken);
 
     try {
-        // Create the issue payload
-        const issuePayload: any = {
+        const issuePayload: CreateIssuePayload = { // Applied strong type
             fields: {
                 project: {
                     key: projectKey
                 },
                 summary: summary,
-                description: adfDescription,
+                description: adfDescription, // This is now strictly checked against ADFContent
                 issuetype: {
                     name: issueType
                 }
@@ -124,7 +154,7 @@ export async function createIssue(args: any) {
         // If assignee name is provided, get their accountId
         if (assigneeName) {
             try {
-                const userResponse = await axios.get(`https://${jiraHost}/rest/api/3/user/search`, {
+                const userResponse = await axios.get<User[]>(`https://${jiraHost}/rest/api/3/user/search`, {
                     params: {
                         query: assigneeName
                     },
@@ -135,12 +165,12 @@ export async function createIssue(args: any) {
                 });
 
                 if (userResponse.data && userResponse.data.length > 0) {
-                    const assigneeUser = userResponse.data.find((user: any) =>
+                    const assigneeUser = userResponse.data.find((user: User) =>
                         user.displayName.toLowerCase() === assigneeName.toLowerCase()
                     ) || userResponse.data[0];
 
-                    issuePayload.fields.assignee = {
-                        id: assigneeUser.accountId
+                    issuePayload.fields.assignee = { // Conforms to JiraIssueUserField
+                        id: assigneeUser.accountId 
                     };
                 }
             } catch (error) {
@@ -151,7 +181,7 @@ export async function createIssue(args: any) {
         // If reporter name is provided, get their accountId
         if (reporterName) {
             try {
-                const userResponse = await axios.get(`https://${jiraHost}/rest/api/3/user/search`, {
+                const userResponse = await axios.get<User[]>(`https://${jiraHost}/rest/api/3/user/search`, {
                     params: {
                         query: reporterName
                     },
@@ -162,11 +192,11 @@ export async function createIssue(args: any) {
                 });
 
                 if (userResponse.data && userResponse.data.length > 0) {
-                    const reporterUser = userResponse.data.find((user: any) =>
+                    const reporterUser = userResponse.data.find((user: User) =>
                         user.displayName.toLowerCase() === reporterName.toLowerCase()
                     ) || userResponse.data[0];
 
-                    issuePayload.fields.reporter = {
+                    issuePayload.fields.reporter = { // Conforms to JiraIssueUserField
                         id: reporterUser.accountId
                     };
                 }
@@ -204,7 +234,7 @@ export async function createIssue(args: any) {
         }
 
         // Fetch the created issue to get full details
-        const issueResponse = await axios.get(`https://${jiraHost}/rest/api/3/issue/${createdIssue.key}`, {
+        const issueResponse = await axios.get<Issue>(`https://${jiraHost}/rest/api/3/issue/${createdIssue.key}`, {
             headers: {
                 'Authorization': authHeader,
                 'Accept': 'application/json',
@@ -241,15 +271,18 @@ export async function createIssue(args: any) {
         }
 
         let descriptionPreview = '';
+        // Check adfDescription structure before trying to access its properties
         if (adfDescription && typeof adfDescription === 'object' && adfDescription.type === 'doc' && Array.isArray(adfDescription.content)) {
-            descriptionPreview = adfDescription.content.map((block: any) => {
+            descriptionPreview = adfDescription.content.map((block: any) => { // block is ADFNode, but any for simplicity here
                 if (block.type === 'paragraph' && Array.isArray(block.content)) {
-                    return block.content.map((c: any) => c.text).join('');
+                    return block.content.map((c: any) => c.text).join(''); // c is ADFNode (text)
                 }
                 return '';
             }).join('\n');
+        } else if (typeof validatedArgs.description === 'string') { // Fallback if it was a string
+             descriptionPreview = validatedArgs.description;
         } else {
-            descriptionPreview = '[ADF description provided]';
+            descriptionPreview = '[Complex ADF description provided]';
         }
         formattedResponse += `\n## Description\n\n${descriptionPreview}\n\n`;
         formattedResponse += `\n**Issue link:** [${issue.key}](https://${jiraHost}/browse/${issue.key})\n`;
@@ -320,7 +353,6 @@ export async function createIssue(args: any) {
             errorTitle = `API Error (${error.response.status})`;
             errorMsg = `The Jira API returned an error with status code ${error.response.status}.`;
             
-            // Try to extract and format the error details
             try {
                 if (typeof error.response.data === 'object') {
                     errorDetails = JSON.stringify(error.response.data, null, 2);
@@ -345,7 +377,6 @@ export async function createIssue(args: any) {
             errorDetails = error.message;
         }
 
-        // Format the error response in Markdown
         const formattedError = `# ${errorTitle}\n\n${errorMsg}\n\n`
             + (errorDetails ? `## Error Details\n\n\`\`\`\n${errorDetails}\n\`\`\`\n\n` : "")
             + (errorSolution ? `## Solution\n\n${errorSolution}` : "");

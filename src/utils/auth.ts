@@ -1,3 +1,5 @@
+import { CredentialsError } from "../types/index.js";
+
 /**
  * Creates a basic authorization header using email and API token
  * 
@@ -8,13 +10,6 @@
 export function createAuthHeader(email: string, apiToken: string): string {
     return `Basic ${Buffer.from(`${email}:${apiToken}`).toString('base64')}`;
 }
-
-/**
- * Validates that the required Jira credentials are present
- * 
- * @param {string | undefined} jiraHost - The Jira host URL
- * @param {string | undefined} email - The email address for Jira authentication
-import { CredentialsError } from "../types/index.js";
 
 /**
  * Validates that the required Jira credentials are present

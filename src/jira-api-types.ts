@@ -206,3 +206,18 @@ export interface Transition {
     };
     // Other fields like `hasScreen`, `isGlobal`, etc., might be present
 }
+
+/**
+ * Represents the structure of individual errors often found in Jira API error responses.
+ */
+export interface JiraErrorDetail {
+  [key: string]: string; // For field-specific errors like { summary: "Summary is too long." }
+}
+
+/**
+ * Represents common structures for error data from the Jira API.
+ */
+export interface JiraErrorResponseData {
+  errorMessages?: string[];
+  errors?: JiraErrorDetail | string[]; // 'errors' can be an object or an array of strings
+}
