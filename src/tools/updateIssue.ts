@@ -4,6 +4,8 @@ import { JiraUpdateIssueRequestSchema } from '../validators/index.js';
 import { createAuthHeader, validateCredentials } from '../utils/auth.js';
 import { toADF } from '../utils/adfUtils.js';
 import { ADFContent, JiraUpdateIssuePayload, JiraTransitionPayload, User, Issue } from '../jira-api-types.js';
+import { KnownError, CredentialsError } from '../types/index.js';
+import { isAxiosErr } from '../utils/index.js';
 
 /**
  * Describes the `jira_update_issue` tool for updating existing Jira issues.
@@ -69,7 +71,10 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
     const email = validatedArgs.email || process.env.JIRA_EMAIL;
     const apiToken = validatedArgs.apiToken || process.env.JIRA_API_TOKEN;
 
-    validateCredentials(jiraHost, email, apiToken);
+    // This specific check for missing credentials before calling validateCredentials
+    // will be handled by validateCredentials itself throwing a CredentialsError.
+    // If validateCredentials is called, it will perform the check.
+    validateCredentials(jiraHost, email, apiToken); 
 
     const authHeader = createAuthHeader(email!, apiToken!);
     const { issueIdOrKey, summary, description, status, assigneeName } = validatedArgs;
@@ -208,39 +213,65 @@ export async function updateIssue(args: yup.InferType<typeof JiraUpdateIssueRequ
 
     return { content: [{ type: "text", text: formattedResponse }], isError: false };
 
-  } catch (error: any) {
-    let errorMessage = "An unexpected error occurred while updating the Jira issue.";
+  } catch (error: unknown) {
+    let errorTitle = "Error Updating Jira Issue";
     let errorCode = "UNKNOWN_ERROR";
+    let errorMessage = "An unexpected error occurred while updating the issue.";
+    let errorDetails = ""; // Specific details from the error
+    let errorSolution = "Please check the details and try again. If the issue persists, ensure your Jira instance is accessible and your credentials are correct.";
 
     if (error instanceof yup.ValidationError) {
-      errorMessage = `Validation Error: ${error.errors.join(', ')}`;
+      errorTitle = "Validation Error";
       errorCode = "VALIDATION_ERROR";
-    } else if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError<any>;
-      if (axiosError.response) {
-        const { status, data } = axiosError.response;
-        const jiraErrors = data?.errorMessages?.join(', ') || data?.errors ? JSON.stringify(data.errors) : '';
-        errorMessage = `Jira API Error (Status ${status}): ${jiraErrors || axiosError.message}`;
-        if (status === 400) errorCode = "JIRA_BAD_REQUEST";
-        else if (status === 401) errorCode = "JIRA_UNAUTHORIZED";
-        else if (status === 403) errorCode = "JIRA_FORBIDDEN";
-        else if (status === 404) errorCode = "JIRA_ISSUE_NOT_FOUND";
-        else errorCode = "JIRA_API_ERROR";
-      } else if (axiosError.request) {
-        errorMessage = `Network Error: Could not connect to Jira host at ${args.jiraHost || process.env.JIRA_HOST}. Please check the host and network connection.`;
+      errorMessage = `The provided input is invalid: ${error.errors.join(', ')}`;
+      errorDetails = `Path: ${error.path}, Value: ${JSON.stringify(error.value, null, 2)}`;
+      errorSolution = "Please correct the input according to the validation rules and try again.";
+    } else if (error instanceof CredentialsError) {
+      errorTitle = "Authentication Error";
+      errorCode = "CREDENTIALS_MISSING";
+      errorMessage = error.message; // Message from CredentialsError
+      errorSolution = "Please ensure your Jira host, email, and API token are correctly configured either in the arguments or as environment variables (JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN).";
+    } else if (isAxiosErr(error)) { // Using the type guard for AxiosError
+      // error is now typed as AxiosError
+      if (error.response) {
+        const { status, data } = error.response;
+        const jiraErrors = data?.errorMessages?.join(', ') || (data?.errors ? JSON.stringify(data.errors) : '');
+        errorTitle = `Jira API Error (${status})`;
+        errorMessage = `The Jira API returned an error: ${jiraErrors || error.message}`;
+        errorDetails = `Response Data: ${JSON.stringify(data, null, 2)}`;
+        
+        switch (status) {
+          case 400: errorCode = "JIRA_BAD_REQUEST"; errorSolution = "The request was malformed. Check the provided parameters."; break;
+          case 401: errorCode = "JIRA_UNAUTHORIZED"; errorSolution = "Authentication failed. Check your Jira email and API token."; break;
+          case 403: errorCode = "JIRA_FORBIDDEN"; errorSolution = "You do not have permission to perform this action on the Jira issue."; break;
+          case 404: errorCode = "JIRA_ISSUE_NOT_FOUND"; errorSolution = `Issue "${validatedArgs.issueIdOrKey}" could not be found. Please verify the issue ID or key.`; break;
+          default: errorCode = "JIRA_API_ERROR"; errorSolution = "An unexpected API error occurred. Check the Jira API status or logs.";
+        }
+      } else if (error.request) {
+        errorTitle = "Network Error";
         errorCode = "NETWORK_ERROR";
+        errorMessage = `Could not connect to Jira host at ${args.jiraHost || process.env.JIRA_HOST}.`;
+        errorSolution = "Please check your network connection and the Jira host URL.";
       } else {
-        errorMessage = `Axios Error: ${axiosError.message}`;
+        errorTitle = "Axios Error";
         errorCode = "AXIOS_ERROR";
+        errorMessage = `An error occurred while setting up the API request: ${error.message}`;
       }
-    } else if (error.message.includes("Missing Jira credentials")) {
-        errorMessage = error.message;
-        errorCode = "CREDENTIALS_MISSING";
+    } else if (error instanceof Error) { // Fallback for other generic Error instances
+      errorTitle = "Unexpected Application Error";
+      errorCode = "APPLICATION_ERROR";
+      errorMessage = "An unexpected error occurred within the application.";
+      errorDetails = error.message; // General error message
+      errorSolution = "Please report this error to the application maintainers.";
     } else {
-      errorMessage = `Error: ${error.message}`;
+      // Handle cases where the error is not even an Error object
+      errorTitle = "Unknown Error Type";
+      errorCode = "UNKNOWN_ERROR_TYPE";
+      errorMessage = "An entirely unexpected and unknown type of error occurred.";
+      errorDetails = String(error); // Convert the unknown error to string
     }
 
-    const formattedError = `## ❌ Error Updating Jira Issue\n\n**Code:** ${errorCode}\n**Message:** ${errorMessage}\n\nPlease check the details and try again. If the issue persists, ensure your Jira instance is accessible and your credentials are correct.`;
+    const formattedError = `## ❌ ${errorTitle}\n\n**Code:** ${errorCode}\n**Message:** ${errorMessage}${errorDetails ? `\n**Details:** ${errorDetails}` : ''}\n\n**Suggestion:** ${errorSolution}`;
     return { content: [{ type: "text", text: formattedError }], isError: true };
   }
 }

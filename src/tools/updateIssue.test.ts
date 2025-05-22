@@ -5,9 +5,11 @@ import { JiraUpdateIssueRequestSchema } from '../validators/index.js'; // For ar
 import { ADFContent, Issue, User } from '../jira-api-types.js';
 import * as authUtils from '../utils/auth.js';
 
+import { CredentialsError } from '../types/index.js';
+
 // Mock utilities
 jest.mock('../utils/auth.js', () => ({
-  validateCredentials: jest.fn(),
+  validateCredentials: jest.fn(), // Default mock, can be overridden per test
   createAuthHeader: jest.fn(() => ({ Authorization: 'Basic MOCKED_TOKEN' })),
 }));
 
@@ -255,12 +257,21 @@ describe('updateIssue Tool', () => {
         expect(result.content[0].text).toContain("Bad request");
     });
 
-    it('should handle Jira API error 401 (Unauthorized on PUT)', async () => {
-        (authUtils.validateCredentials as jest.Mock).mockImplementationOnce(() => { throw new Error("Missing Jira credentials") });
-        const result = await updateIssue({ ...defaultArgs, jiraHost: '', summary: "Test" }); // remove host to trigger validation
+    it('should handle Jira API error 401 (Unauthorized, simulated by missing credentials)', async () => {
+        // This test now more accurately reflects a CredentialsError scenario
+        const specificErrorMessage = "Missing required Jira credentials: Jira host. Please provide them in the request or set them as environment variables (JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN).";
+        (authUtils.validateCredentials as jest.Mock).mockImplementationOnce(() => { 
+          throw new CredentialsError(specificErrorMessage);
+        });
+        
+        // Intentionally pass empty jiraHost to trigger the mocked validateCredentials error
+        const result = await updateIssue({ ...defaultArgs, jiraHost: '', summary: "Test" }); 
+        
         expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("## ❌ Authentication Error");
         expect(result.content[0].text).toContain("Code:** CREDENTIALS_MISSING");
-        expect(result.content[0].text).toContain("Missing Jira credentials");
+        expect(result.content[0].text).toContain(specificErrorMessage);
+        expect(result.content[0].text).toContain("Suggestion:** Please ensure your Jira host, email, and API token are correctly configured");
     });
     
     it('should handle Jira API error 403 (Forbidden on PUT)', async () => {
@@ -271,24 +282,30 @@ describe('updateIssue Tool', () => {
         expect(result.content[0].text).toContain("Forbidden action");
     });
 
-    it('should handle missing credentials if not mocked/provided (env vars not set)', async () => {
-        process.env.JIRA_HOST = ''; // Simulate missing env var
-        (authUtils.validateCredentials as jest.Mock).mockImplementationOnce(() => { throw new Error("Missing Jira credentials: Jira host is required.") });
+    it('should handle missing credentials (e.g. JIRA_HOST env var not set and no arg provided)', async () => {
+        const errorMessage = "Missing required Jira credentials: Jira host. Please provide them in the request or set them as environment variables (JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN).";
+        // Mock validateCredentials to throw the specific error
+        (authUtils.validateCredentials as jest.Mock).mockImplementation(() => {
+          throw new CredentialsError(errorMessage);
+        });
 
-        const result = await updateIssue({ ...defaultArgs, jiraHost: '' }); // No host
+        // Simulate missing JIRA_HOST by not providing it in args and assuming env var is also not set (mock will throw)
+        const result = await updateIssue({ ...defaultArgs, jiraHost: undefined }); 
+        
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain('## ❌ Error Updating Jira Issue');
+        expect(result.content[0].text).toContain('## ❌ Authentication Error');
         expect(result.content[0].text).toContain('Code:** CREDENTIALS_MISSING');
-        expect(result.content[0].text).toContain('Missing Jira credentials: Jira host is required.');
-        expect(authUtils.validateCredentials).toHaveBeenCalled();
+        expect(result.content[0].text).toContain(errorMessage);
+        expect(authUtils.validateCredentials).toHaveBeenCalledWith(undefined, mockEmail, mockApiToken);
     });
 
-    it('should handle validation errors (missing issueIdOrKey)', async () => {
+    it('should handle validation errors (missing issueIdOrKey) with detailed message', async () => {
       const result = await updateIssue({ ...defaultArgs, issueIdOrKey: undefined as any });
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('## ❌ Error Updating Jira Issue');
+      expect(result.content[0].text).toContain('## ❌ Validation Error');
       expect(result.content[0].text).toContain('Code:** VALIDATION_ERROR');
-      expect(result.content[0].text).toContain('issueIdOrKey is a required field');
+      expect(result.content[0].text).toContain('The provided input is invalid: issueIdOrKey is a required field');
+      expect(result.content[0].text).toContain('Path: issueIdOrKey');
     });
   });
 

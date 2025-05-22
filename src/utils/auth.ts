@@ -14,11 +14,24 @@ export function createAuthHeader(email: string, apiToken: string): string {
  * 
  * @param {string | undefined} jiraHost - The Jira host URL
  * @param {string | undefined} email - The email address for Jira authentication
+import { CredentialsError } from "../types/index.js";
+
+/**
+ * Validates that the required Jira credentials are present
+ * 
+ * @param {string | undefined} jiraHost - The Jira host URL
+ * @param {string | undefined} email - The email address for Jira authentication
  * @param {string | undefined} apiToken - The API token for Jira authentication
- * @throws {Error} If any of the required credentials are missing
+ * @throws {CredentialsError} If any of the required credentials are missing
  */
 export function validateCredentials(jiraHost: string | undefined, email: string | undefined, apiToken: string | undefined): void {
-    if (!jiraHost || !email || !apiToken) {
-        throw new Error("Missing required Jira credentials. Please provide them in the request or set them in the .env file.");
+    const missingFields: string[] = [];
+    if (!jiraHost) missingFields.push("Jira host");
+    if (!email) missingFields.push("email");
+    if (!apiToken) missingFields.push("API token");
+
+    if (missingFields.length > 0) {
+        const message = `Missing required Jira credentials: ${missingFields.join(', ')}. Please provide them in the request or set them as environment variables (JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN).`;
+        throw new CredentialsError(message);
     }
 }
