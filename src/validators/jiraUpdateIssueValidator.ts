@@ -1,5 +1,6 @@
 import * as yup from 'yup';
 import { ADFContent } from '../jira-api-types.js';
+import { isValidADFNodeArray } from './adfValidationUtils.js';
 
 /**
  * Defines the validation schema for the `jira_update_issue` tool request.
@@ -44,18 +45,22 @@ export const JiraUpdateIssueRequestSchema = yup.object({
    */
   description: yup.mixed<string | ADFContent>().optional().test(
     'is-string-or-adf',
-    'Description must be a string or a valid ADF object',
-    value => {
-      if (value === undefined || typeof value === 'string') return true;
-      if (typeof value === 'object' && value !== null) {
-        const adf = value as ADFContent; // Cast to ADFContent for type checking
-        if (adf.type === 'doc' && adf.version === 1 && Array.isArray(adf.content)) {
-          // Basic ADF structure check. For a more thorough validation,
-          // one might iterate through adf.content and validate each node.
-          return true;
-        }
+    'Description must be a string or a valid ADF object (with valid node structure)',
+    (value: unknown): boolean => {
+      if (value === undefined || typeof value === 'string') {
+        return true; // Allow undefined or string
       }
-      return false;
+      if (
+        typeof value === 'object' &&
+        value !== null &&
+        (value as ADFContent).type === 'doc' &&
+        (value as ADFContent).version === 1 &&
+        Array.isArray((value as ADFContent).content)
+      ) {
+        // Now use the helper function for deep validation of the content array
+        return isValidADFNodeArray((value as ADFContent).content);
+      }
+      return false; // Not a string and not a valid ADF object structure
     }
   ),
 
