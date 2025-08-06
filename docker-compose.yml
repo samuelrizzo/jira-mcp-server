@@ -1,0 +1,11 @@
+services:
+  jira-mcp-server:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - JIRA_HOST=your-domain.atlassian.net
+      - JIRA_EMAIL=your-email@example.com
+      - JIRA_API_TOKEN=your-api-token-here
+      - SERVER_PORT=3000
+    command: npm start
